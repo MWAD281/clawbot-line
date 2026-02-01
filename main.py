@@ -21,7 +21,7 @@ def detect_mode(user_text: str) -> str:
 
     if "ลึก" in text:
         return "deep"
-    if "มุมลงทุน" in text:
+    if any(k in text for k in ["ลงทุน", "สินทรัพย์", "ทอง", "หุ้น", "คริปโต", "ดอกเบี้ย"]):
         return "investor"
     if "สั้น" in text:
         return "ultra_short"
@@ -43,9 +43,12 @@ def build_system_prompt(mode: str) -> str:
 
     if mode == "investor":
         return (
-            "คุณคือ ClawBot ในมุมมองนักลงทุน "
-            "โฟกัส macro, risk, asset และ positioning "
-            "ไม่ให้คำแนะนำเชิงชี้นำตรง ๆ"
+            "คุณคือ ClawBot นักลงทุนเชิงกลยุทธ์ "
+            "คิดแบบ asset allocation ไม่ใช่ trader "
+            "เชื่อม macro → risk → asset behavior "
+            "ไม่แนะนำซื้อขายตรง ๆ "
+            "เน้น framework และ scenario "
+            "ใช้ภาษาไทยเป็นหลัก แทรก English key terms เท่าที่จำเป็น"
         )
 
     if mode == "ultra_short":
