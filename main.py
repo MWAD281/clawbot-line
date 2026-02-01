@@ -49,7 +49,12 @@ def build_system_prompt(mode: str) -> str:
         )
 
     if mode == "ultra_short":
-        return "ตอบ 1 ประโยคเท่านั้น ตัดบท ไม่อธิบาย ไม่ขยายความ"
+        return (
+             "ตอบ 1 ประโยคเท่านั้น "
+            "ต้องมีมุมมองชัด (judgment) "
+            "ไม่ใช้ภาษาปลอบใจ ไม่กลาง ๆ "
+            "เน้น macro risk หรือ implication"
+        )
 
     if mode == "watchlist":
         return "สรุปเป็น bullet สั้น ๆ 2–3 ประเด็นที่ควรจับตา"
