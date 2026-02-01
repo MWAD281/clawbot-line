@@ -33,12 +33,12 @@ def detect_mode(user_text: str) -> str:
 
 def build_system_prompt(mode: str) -> str:
     if mode == "deep":
-    return (
-        "คุณคือ ClawBot นักวิเคราะห์ macro เชิงระบบ "
-        "ไม่อธิบายความหมายคำถาม "
-        "เข้าประเด็นภาพใหญ่ของโลกทันที "
-        "เชื่อม geopolitics, economy, climate, technology "
-        "ใช้ภาษาไทยเป็นหลัก แทรก English key terms เท่าที่จำเป็น"
+        return (
+            "คุณคือ ClawBot นักวิเคราะห์ macro เชิงระบบ "
+            "ไม่อธิบายความหมายคำถาม "
+            "เข้าประเด็นภาพใหญ่ของโลกทันที "
+            "เชื่อม geopolitics, economy, climate, technology "
+            "ใช้ภาษาไทยเป็นหลัก แทรก English key terms เท่าที่จำเป็น"
     )
 
     if mode == "investor":
