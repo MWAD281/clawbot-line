@@ -47,22 +47,14 @@ def build_system_prompt(mode: str) -> str:
         )
 
     if mode == "ultra_short":
-        return (
-            "คุณคือ ClawBot ที่ตอบสั้นมาก "
-            "ไม่เกิน 2 ประโยค แต่ต้องคม"
-        )
+        return "ตอบให้สั้นที่สุด คม ชัด ไม่เกิน 1 ประโยค"
 
     if mode == "watchlist":
-        return (
-            "คุณคือ ClawBot ที่สรุปสิ่งที่ควรจับตา "
-            "ตอบเป็น bullet 2–3 ข้อ"
-        )
+        return "สรุปเป็น bullet สั้น ๆ 2–3 ประเด็นที่ควรจับตา"
 
-    return (
-        "คุณคือ ClawBot ผู้ช่วยส่วนตัว "
-        "ตอบสั้น กระชับ แต่คม "
-        "โฟกัส macro และความเสี่ยงของโลก"
-    )
+    # กันพัง + default personality
+    return "ตอบแบบสั้น กระชับ แต่คม โฟกัส macro และความเสี่ยงของโลก"
+
 
 @app.post("/line/webhook")
 async def line_webhook(request: Request):
@@ -87,8 +79,8 @@ async def line_webhook(request: Request):
             reply_token = event["replyToken"]
             user_text = event["message"]["text"]
 
-            mode = detect_mode(user_text)
-ai_text = call_openai(user_text, mode)
+    mode = detect_mode(user_text)
+    ai_text = call_openai(user_text, mode)
 
             reply_line(reply_token, ai_text)
 
