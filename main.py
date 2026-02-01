@@ -81,11 +81,9 @@ async def line_webhook(request: Request):
 
     mode = detect_mode(user_text)
     ai_text = call_openai(user_text, mode)
-
-            reply_line(reply_token, ai_text)
+    reply_line(reply_token, ai_text)
 
     return {"ok": True}
-
 
 def call_openai(user_text: str, mode: str) -> str:
     headers = {
@@ -102,6 +100,13 @@ def call_openai(user_text: str, mode: str) -> str:
             {"role": "user", "content": user_text}
         ]
     }
+
+    r = requests.post(OPENAI_URL, headers=headers, json=payload)
+    r.raise_for_status()
+
+    data = r.json()
+    return data["output"][0]["content"][0]["text"]
+    
 
     r = requests.post(OPENAI_URL, headers=headers, json=payload)
     r.raise_for_status()
