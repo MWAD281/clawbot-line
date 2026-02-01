@@ -108,28 +108,6 @@ def call_openai(user_text: str, mode: str) -> str:
 
     data = r.json()
     return data["output"][0]["content"][0]["text"]
-    
-
-    r = requests.post(OPENAI_URL, headers=headers, json=payload)
-    r.raise_for_status()
-
-    data = r.json()
-    return data["output"][0]["content"][0]["text"]
-    headers = {
-        "Authorization": f"Bearer {OPENAI_API_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    payload = {
-        "model": "gpt-4.1-mini",
-        "input": f"ตอบแบบสั้น กระชับ แต่คม:\n{user_text}"
-    }
-
-    r = requests.post(OPENAI_URL, headers=headers, json=payload)
-    r.raise_for_status()
-
-    data = r.json()
-    return data["output"][0]["content"][0]["text"]
 
 
 def reply_line(reply_token: str, text: str):
