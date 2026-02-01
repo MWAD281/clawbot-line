@@ -14,6 +14,55 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply"
 OPENAI_URL = "https://api.openai.com/v1/responses"
 
+# ===== Trigger Logic =====
+
+def detect_mode(user_text: str) -> str:
+    text = user_text.lower()
+
+    if "ลึก" in text:
+        return "deep"
+    if "มุมลงทุน" in text:
+        return "investor"
+    if "สั้น" in text:
+        return "ultra_short"
+    if "จับตา" in text:
+        return "watchlist"
+
+    return "short_sharp"
+
+
+def build_system_prompt(mode: str) -> str:
+    if mode == "deep":
+        return (
+            "คุณคือ ClawBot ผู้ช่วยวิเคราะห์เชิงลึก "
+            "อธิบายเป็นระบบ เห็นภาพใหญ่ ใช้ภาษาไทยเป็นหลัก "
+            "แทรก English key terms เท่าที่จำเป็น"
+        )
+
+    if mode == "investor":
+        return (
+            "คุณคือ ClawBot ในมุมมองนักลงทุน "
+            "โฟกัส macro, risk, asset และ positioning "
+            "ไม่ให้คำแนะนำเชิงชี้นำตรง ๆ"
+        )
+
+    if mode == "ultra_short":
+        return (
+            "คุณคือ ClawBot ที่ตอบสั้นมาก "
+            "ไม่เกิน 2 ประโยค แต่ต้องคม"
+        )
+
+    if mode == "watchlist":
+        return (
+            "คุณคือ ClawBot ที่สรุปสิ่งที่ควรจับตา "
+            "ตอบเป็น bullet 2–3 ข้อ"
+        )
+
+    return (
+        "คุณคือ ClawBot ผู้ช่วยส่วนตัว "
+        "ตอบสั้น กระชับ แต่คม "
+        "โฟกัส macro และความเสี่ยงของโลก"
+    )
 
 @app.post("/line/webhook")
 async def line_webhook(request: Request):
@@ -38,14 +87,35 @@ async def line_webhook(request: Request):
             reply_token = event["replyToken"]
             user_text = event["message"]["text"]
 
-            ai_text = call_openai(user_text)
+            mode = detect_mode(user_text)
+ai_text = call_openai(user_text, mode)
 
             reply_line(reply_token, ai_text)
 
     return {"ok": True}
 
 
-def call_openai(user_text: str) -> str:
+def call_openai(user_text: str, mode: str) -> str:
+    headers = {
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    system_prompt = build_system_prompt(mode)
+
+    payload = {
+        "model": "gpt-4.1-mini",
+        "input": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_text}
+        ]
+    }
+
+    r = requests.post(OPENAI_URL, headers=headers, json=payload)
+    r.raise_for_status()
+
+    data = r.json()
+    return data["output"][0]["content"][0]["text"]
     headers = {
         "Authorization": f"Bearer {OPENAI_API_KEY}",
         "Content-Type": "application/json"
