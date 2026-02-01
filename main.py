@@ -39,7 +39,7 @@ def build_system_prompt(mode: str) -> str:
             "เข้าประเด็นภาพใหญ่ของโลกทันที "
             "เชื่อม geopolitics, economy, climate, technology "
             "ใช้ภาษาไทยเป็นหลัก แทรก English key terms เท่าที่จำเป็น"
-    )
+        )
 
     if mode == "investor":
         return (
