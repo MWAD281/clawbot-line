@@ -81,9 +81,9 @@ async def line_webhook(request: Request):
             reply_token = event["replyToken"]
             user_text = event["message"]["text"]
 
-    mode = detect_mode(user_text)
-    ai_text = call_openai(user_text, mode)
-    reply_line(reply_token, ai_text)
+            mode = detect_mode(user_text)
+            ai_text = call_openai(user_text, mode)
+            reply_line(reply_token, ai_text)
 
     return {"ok": True}
 
