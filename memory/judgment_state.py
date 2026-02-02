@@ -1,37 +1,23 @@
-import json
-import os
+# memory/judgment_state.py
 
-STATE_FILE = "memory/world_judgment.json"
-
-DEFAULT_STATE = {
-    "global_risk": "UNKNOWN",
-    "worldview": "UNSET",
+_JUDGMENT_STATE = {
+    "global_risk": "MEDIUM",
+    "worldview": "MIXED",
     "stance": "NEUTRAL",
+    "source": "BOOT",
     "inertia": 1.0
 }
 
-
-def load_state():
-    if not os.path.exists(STATE_FILE):
-        save_state(DEFAULT_STATE)
-        return DEFAULT_STATE
-    with open(STATE_FILE, "r") as f:
-        return json.load(f)
-
-
-def save_state(state: dict):
-    with open(STATE_FILE, "w") as f:
-        json.dump(state, f, indent=2)
-
-
-def get_judgment():
-    return load_state()
-
+def get_judgment() -> dict:
+    return _JUDGMENT_STATE.copy()
 
 def overwrite_judgment(new_state: dict):
-    save_state(new_state)
+    _JUDGMENT_STATE.update(new_state)
 
-def merge_judgment(patch: dict):
-    state = load_state()
-    state.update(patch)
-    save_state(state)
+# ✅ FIX: alias ให้ agent_evolver ใช้ได้
+def save_judgment(partial_state: dict):
+    """
+    Save incremental judgment updates (agent-level)
+    Currently same behavior as overwrite_judgment
+    """
+    overwrite_judgment(partial_state)
