@@ -7,10 +7,10 @@ from fastapi import FastAPI, Request, HTTPException
 
 from agents.investor_agents import run_investor_swarm
 from agents.finance_agents import run_finance_swarm
-from memory.judgment_state import get_judgment
+from memory.judgment_state import get_judgment, overwrite_judgment
 from evolution.judgment_evolver import evolve_from_ai
 from world.routes import router as world_router
-from memory.judgment_state import get_judgment, overwrite_judgment
+
 
 app = FastAPI()
 app.include_router(world_router)
