@@ -17,7 +17,7 @@ def ceo_alpha(world_input: str, world_state: dict):
         reason = "Risk not resolved, downside asymmetric"
 
     return {
-        "ceo": "alpha",
+        "agent_id": "CEO_ALPHA",   # ← แก้ตรงนี้
         "global_risk": vote,
         "stance": stance,
         "confidence": 0.7,
