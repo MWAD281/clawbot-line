@@ -1,7 +1,7 @@
 # world/council.py
 
 from memory.judgment_state import overwrite_judgment, get_judgment
-from memory.agent_weights import get_weight   # ✅ ต้องเพิ่มบรรทัดนี้
+from memory.agent_weights import get_weight, is_muted
 from world.debate import run_ceo_debate
 
 
@@ -23,6 +23,9 @@ def council_decide(world_input: dict):
     for v in ceo_votes:
         agent_id = v.get("agent_id")
         risk = v.get("global_risk", "MEDIUM")
+
+        if not agent_id or is_muted(agent_id):
+            continue   # 🔇 CEO ที่น้ำหนักต่ำ = ไม่มีเสียง
 
         weight = get_weight(agent_id)
         confidence = v.get("confidence", 0.5)
