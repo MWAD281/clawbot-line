@@ -22,6 +22,10 @@ OPENAI_URL = "https://api.openai.com/v1/responses"
 def detect_mode(user_text: str) -> str:
     text = user_text.lower()
 
+    # 🔥 คำถามเชิง abstract / ภาพโลก
+    if "โลก" in text or "น่ากลัว" in text:
+        return "deep"
+
     if "ลึก" in text:
         return "deep"
     if any(k in text for k in ["ลงทุน", "สินทรัพย์", "หุ้น", "ดอกเบี้ย"]):
