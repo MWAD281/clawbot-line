@@ -190,39 +190,25 @@ def health_check():
 def world_state():
     return get_judgment()
 
+
 # -------------------------
 # PRE-BIRTH FEAR INJECTION
 # -------------------------
 
+from memory.judgment_state import overwrite_judgment
+
 @app.post("/world/fear")
 def inject_prebirth_fear():
-    """
-    Force ClawBot to start from fear-before-crisis worldview
-    """
     fear_state = {
         "global_risk": "LATENT_SYSTEMIC_RISK",
         "worldview": "FRAGILE_COMPLEX_SYSTEM",
         "stance": "CAUTIOUS",
-        "inertia": 2.5,
-        "origin": "PRE_BIRTH_IMPRINT",
-        "core_fear": {
-            "type": "SUDDEN_COLLAPSE",
-            "belief": "Systems fail non-linearly after long stability",
-            "confidence": 0.75
-        }
+        "inertia": 2.5
     }
 
-    # ⬇️ overwrite judgment memory
-    evolve_from_ai(
-        f"""
-        SYSTEM IMPRINT EVENT:
-        The world appears stable, but hidden leverage, liquidity mismatch,
-        and delayed feedback loops imply high probability of sudden collapse.
-        Overconfidence before crisis is the dominant historical pattern.
-        """
-    )
+    overwrite_judgment(fear_state)
 
     return {
         "status": "FEAR IMPRINTED",
-        "message": "ClawBot now assumes latent catastrophe as baseline"
+        "state": fear_state
     }
