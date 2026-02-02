@@ -1,54 +1,41 @@
 # evolution/judgment_evolver.py
 
-from memory.judgment_state import get_judgment, overwrite_judgment
+def evolve_judgment(judgment: dict, outcome: dict) -> dict:
+    """
+    ปรับ worldview ของระบบจาก outcome โลกจริง
+    ใช้โดย agent_evolver
+    """
 
-EVOLUTION_BUFFER = {
-    "risk_hits": 0,
-    "stability_hits": 0
-}
+    score = outcome.get("score", 0)
+    global_risk = outcome.get("global_risk", 0.5)
 
-def evolve_from_ai(ai_text: str):
-    text = ai_text.lower()
-    state = get_judgment()
+    # ค่า default
+    judgment.setdefault("worldview", "neutral")
+    judgment.setdefault("confidence", 0.5)
 
-    inertia = state.get("inertia", 1.0)
+    # 🔁 Logic การเปลี่ยน worldview
+    if score < -0.5 or global_risk > 0.7:
+        judgment["worldview"] = "defensive"
+        judgment["confidence"] = max(0.1, judgment["confidence"] - 0.1)
 
-    if any(k in text for k in [
-        "systemic risk",
-        "liquidity shock",
-        "credit stress",
-        "collapse",
-        "crisis",
-        "bank run",
-        "contagion"
-    ]):
-        EVOLUTION_BUFFER["risk_hits"] += 1
+    elif score > 0.5 and global_risk < 0.4:
+        judgment["worldview"] = "aggressive"
+        judgment["confidence"] = min(0.9, judgment["confidence"] + 0.1)
 
-    if any(k in text for k in [
-        "soft landing",
-        "inflation easing",
-        "liquidity improving",
-        "policy support",
-        "risk stabilizing"
-    ]):
-        EVOLUTION_BUFFER["stability_hits"] += 1
+    else:
+        judgment["worldview"] = "neutral"
 
-    if EVOLUTION_BUFFER["risk_hits"] >= int(2 * inertia):
-        overwrite_judgment({
-            "global_risk": "HIGH",
-            "worldview": "SYSTEMIC_STRESS",
-            "stance": "DEFENSIVE",
-            "inertia": inertia + 0.5
-        })
-        EVOLUTION_BUFFER["risk_hits"] = 0
-        EVOLUTION_BUFFER["stability_hits"] = 0
-        return
+    return judgment
 
-    if EVOLUTION_BUFFER["stability_hits"] >= int(4 * inertia):
-        overwrite_judgment({
-            "global_risk": "MEDIUM",
-            "worldview": "STABILIZING",
-            "stance": "CAUTIOUS",
-            "inertia": max(1.0, inertia - 0.1)
-        })
-        EVOLUTION_BUFFER["stability_hits"] = 0
+
+# ✅ รองรับ future API / main.py (Phase ต่อไป)
+def evolve_from_ai(world_state: dict, ai_result: dict) -> dict:
+    """
+    evolve judgment จากผลลัพธ์ AI โดยตรง
+    (ตอนนี้ยังเป็น wrapper ธรรมดา)
+    """
+    outcome = {
+        "score": ai_result.get("score", 0),
+        "global_risk": ai_result.get("global_risk", 0.5)
+    }
+    return evolve_judgment(world_state, outcome)
