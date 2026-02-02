@@ -1,13 +1,13 @@
 # world/outcome_schema.py
 
-def normalize_outcome(raw: dict) -> dict:
+def normalize_outcome(result: dict) -> dict:
     """
-    แปลง outcome ให้เป็น schema กลาง
+    Normalize council/world output before sending to API response
     """
     return {
-        "market_crash": raw.get("market_crash", False),
-        "volatility_spike": raw.get("volatility_spike", False),
-        "liquidity_freeze": raw.get("liquidity_freeze", False),
-        "risk_assets_down": raw.get("risk_assets_down", False),
-        "timestamp": raw.get("timestamp")
+        "risk": result.get("final_risk", "MEDIUM"),
+        "stance": result.get("stance", "UNKNOWN"),
+        "source": result.get("source", "SYSTEM"),
+        "votes": result.get("votes", {}),
+        "score": result.get("score", {})
     }
