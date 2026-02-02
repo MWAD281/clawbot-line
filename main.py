@@ -5,7 +5,6 @@ import base64
 import requests
 from fastapi import FastAPI, Request, HTTPException
 
-from agents.investor_agents import run_investor_swarm
 from agents.finance_agents import run_finance_swarm
 from memory.judgment_state import get_judgment, overwrite_judgment
 from evolution.judgment_evolver import evolve_from_ai
