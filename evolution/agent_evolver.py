@@ -1,5 +1,3 @@
-# evolution/agent_evolver.py
-
 from memory.agent_weights import adjust_weight
 
 def evolve_agents(judgment: dict, outcome: dict):
@@ -17,10 +15,14 @@ def evolve_agents(judgment: dict, outcome: dict):
         if not agent or not risk:
             continue
 
-        # 🔥 ตลาดพัง → คนที่กลัวถูกต้อง
+        # 🔥 ตลาดพัง → คนที่เตือน HIGH ถูก
         if outcome.get("market_crash") and risk == "HIGH":
-            adjust_weight(agent, +0.2)
+            adjust_weight(agent, +0.3)
 
         # ❌ ตลาดพัง → คนที่บอก LOW ผิด
         elif outcome.get("market_crash") and risk == "LOW":
-            adjust_weight(agent, -0.2)
+            adjust_weight(agent, -0.4)
+
+        # 🧊 ตลาดนิ่ง → คนที่กลัวเกินไป
+        elif not outcome.get("market_crash") and risk == "HIGH":
+            adjust_weight(agent, -0.1)
