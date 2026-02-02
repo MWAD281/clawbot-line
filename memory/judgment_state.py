@@ -1,9 +1,9 @@
 # memory/judgment_state.py
 
 JUDGMENT_STATE = {
-    "global_risk": "UNKNOWN",   # LOW | MEDIUM | HIGH
-    "worldview": "UNSET",       # STABLE | FRAGILE | CRISIS
-    "stance": "NEUTRAL"         # OFFENSIVE | DEFENSIVE
+    "global_risk": "MEDIUM",     # โลกมีความเสี่ยงเชิงระบบอยู่แล้ว
+    "worldview": "FRAGILE",      # เปราะบาง แต่ยังไม่แตก
+    "stance": "DEFENSIVE"        # default = ระวังตัว
 }
 
 def update_judgment(global_risk: str, worldview: str, stance: str) -> None:
