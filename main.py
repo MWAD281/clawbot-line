@@ -6,6 +6,7 @@ import requests
 from fastapi import FastAPI, Request, HTTPException
 
 from agents import run_investor_swarm
+from agents.finance_agents import run_finance_swarm
 
 app = FastAPI()
 
@@ -23,15 +24,18 @@ def detect_mode(user_text: str) -> str:
 
     if "ลึก" in text:
         return "deep"
-    if any(k in text for k in ["ลงทุน", "สินทรัพย์", "ทอง", "หุ้น", "คริปโต", "ดอกเบี้ย"]):
+    if any(k in text for k in ["ลงทุน", "สินทรัพย์", "หุ้น", "ดอกเบี้ย"]):
         return "investor"
-    if "สั้น" in text:
-        return "ultra_short"
+    if "คริปโต" in text:
+        return "crypto"
+    if "ทอง" in text or "commodity" in text:
+        return "commodity"
     if "จับตา" in text:
         return "watchlist"
+    if "สั้น" in text:
+        return "ultra_short"
 
     return "short_sharp"
-
 
 def build_system_prompt(mode: str) -> str:
     if mode == "deep":
@@ -92,13 +96,18 @@ async def line_webhook(request: Request):
             reply_token = event["replyToken"]
             user_text = event["message"]["text"]
 
+            # Detect mode
             mode = detect_mode(user_text)
-            
+
+            # Call appropriate bot
             if mode == "investor":
                 ai_text = run_investor_swarm(user_text)
+            elif mode in ["crypto", "commodity", "watchlist"]:
+                ai_text = run_finance_swarm(user_text)
             else:
                 ai_text = call_openai(user_text, mode)
 
+            # Reply back to LINE
             reply_line(reply_token, ai_text)
 
     return {"ok": True}
