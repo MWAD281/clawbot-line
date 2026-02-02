@@ -186,3 +186,7 @@ def reply_line(reply_token: str, text: str):
 def health_check():
     return {"status": "ClawBot alive"}
 
+@app.get("/world")
+def world_state():
+    return get_judgment()
+
