@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request, HTTPException
 
 from agents.investor_agents import run_investor_swarm
 from agents.finance_agents import run_finance_swarm
+from memory.judgment_state import get_judgment, update_judgment
 
 app = FastAPI()
 
@@ -52,7 +53,7 @@ def build_system_prompt(mode: str) -> str:
             "ใช้ภาษาไทยเป็นหลัก แทรก English key terms ที่จำเป็นเท่านั้น "
             "ไม่ปลอบใจ ไม่ให้คำแนะนำซื้อขายตรง "
             "ตอนท้ายต้องมีหัวข้อชัดเจนว่า 'Judgment:' "
-            "และสรุปโลกตอนนี้ด้วย 1–2 ประโยคแบบฟันธง ห้ามกลาง ๆ"
+            "และสรุปโลกตอนนี้ด้วย 1–2 ประโยคแบบฟันธง ห้ามกลาง ๆ "
             "Judgment ต้องเลือก stance เดียว ห้ามมีคำว่า 'ทั้งนี้', 'อย่างไรก็ตาม', หรือ 'ขึ้นอยู่กับ'"
         )
         
