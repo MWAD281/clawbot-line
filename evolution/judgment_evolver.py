@@ -1,6 +1,6 @@
 # evolution/judgment_evolver.py
 
-from memory.judgment_state import update_judgment, JUDGMENT_STATE
+from memory.judgment_state import overwrite_judgment, get_judgment
 
 EVOLUTION_BUFFER = {
     "risk_hits": 0,
