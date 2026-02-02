@@ -3,7 +3,6 @@
 from fastapi import APIRouter
 from evolution.agent_evolver import evolve_agents
 from memory.judgment_state import get_judgment
-from world.normalize import normalize_outcome
 
 router = APIRouter()
 
@@ -22,7 +21,7 @@ def weekly_evolve(raw_input: dict):
     รับ input จากโลก (text หรือ outcome)
     """
 
-    # 🧠 ถ้ามี text → แปลงเป็น outcome แบบ heuristic ชั่วคราว
+    # 🧠 ถ้ามี text → สร้าง outcome แบบ heuristic
     if "text" in raw_input:
         text = raw_input["text"]
 
@@ -31,8 +30,11 @@ def weekly_evolve(raw_input: dict):
             "global_risk": 0.8 if ("สงคราม" in text or "ดอกเบี้ย" in text) else 0.4
         }
     else:
-        # กรณีส่ง outcome มาโดยตรง
-        outcome = normalize_outcome(raw_input)
+        # fallback ถ้าส่ง outcome มาเอง
+        outcome = {
+            "score": float(raw_input.get("score", 0.0)),
+            "global_risk": float(raw_input.get("global_risk", 0.5))
+        }
 
     judgment = get_judgment()
     evolve_agents(judgment, outcome)
