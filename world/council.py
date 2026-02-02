@@ -1,7 +1,9 @@
 # world/council.py
 
 from memory.judgment_state import overwrite_judgment, get_judgment
+from memory.agent_weights import get_weight   # ✅ ต้องเพิ่มบรรทัดนี้
 from world.debate import run_ceo_debate
+
 
 def council_decide(world_input: dict):
     world_state = get_judgment()
@@ -13,9 +15,9 @@ def council_decide(world_input: dict):
     )
 
     risk_score = {
-        "LOW": 0,
-        "MEDIUM": 0,
-        "HIGH": 0
+        "LOW": 0.0,
+        "MEDIUM": 0.0,
+        "HIGH": 0.0
     }
 
     for v in ceo_votes:
