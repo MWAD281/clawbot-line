@@ -1,15 +1,19 @@
 # memory/judgment_state.py
 
 JUDGMENT_STATE = {
-    "global_risk": "MEDIUM",     # โลกมีความเสี่ยงเชิงระบบอยู่แล้ว
-    "worldview": "FRAGILE",      # เปราะบาง แต่ยังไม่แตก
-    "stance": "DEFENSIVE"        # default = ระวังตัว
+    "global_risk": "UNKNOWN",
+    "worldview": "UNSET",
+    "stance": "NEUTRAL",
+    "inertia": 1.0   # ยิ่งสูง โลกยิ่งเปลี่ยนยาก
 }
 
-def update_judgment(global_risk: str, worldview: str, stance: str) -> None:
+def update_judgment(global_risk, worldview, stance, inertia_delta=0.0):
     JUDGMENT_STATE["global_risk"] = global_risk
     JUDGMENT_STATE["worldview"] = worldview
     JUDGMENT_STATE["stance"] = stance
 
-def get_judgment() -> dict:
-    return JUDGMENT_STATE.copy()  # ป้องกันโดนแก้จากภายนอก
+    # inertia เปลี่ยนแบบสะสม
+    JUDGMENT_STATE["inertia"] = max(
+        0.5,
+        min(3.0, JUDGMENT_STATE["inertia"] + inertia_delta)
+    )
