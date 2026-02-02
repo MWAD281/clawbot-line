@@ -6,19 +6,17 @@ from memory.judgment_state import get_judgment, overwrite_judgment
 def evolve_judgment(judgment: dict, outcome: dict) -> dict:
     """
     ปรับ worldview ของระบบจาก outcome โลกจริง
-    ใช้โดย agent_evolver / evolve_from_ai
     """
 
+    # 🧟 HARD GUARD: กัน type พัง
     if not isinstance(judgment, dict):
-        return judgment
-
-    if not isinstance(outcome, dict):
-        return judgment
+        print("EVOLVE SKIP: judgment is not dict ->", type(judgment))
+        judgment = {}
 
     score = outcome.get("score", 0)
     global_risk = outcome.get("global_risk", 0.5)
 
-    # ค่า default (กันพัง)
+    # ค่า default
     judgment.setdefault("worldview", "neutral")
     judgment.setdefault("confidence", 0.5)
 
@@ -37,23 +35,21 @@ def evolve_judgment(judgment: dict, outcome: dict) -> dict:
     return judgment
 
 
-# 🧬 Phase 9+ : evolve จากผล AI โดยตรง (LINE / OpenAI)
-def evolve_from_ai(user_text: str, ai_result) -> dict:
+def evolve_from_ai(user_text: str, ai_result: dict) -> dict:
     """
     evolve judgment จากผลลัพธ์ AI
-    - ai_result ต้องเป็น dict (raw OpenAI response หรือ structured result)
-    - ถ้าไม่ใช่ dict → ignore (ไม่พังระบบ)
+    - ดึง judgment จาก memory เอง
+    - user_text ใช้สำหรับ future semantic analysis
     """
 
-    # 🛡️ กันพังระดับระบบ
-    if not isinstance(ai_result, dict):
-        return get_judgment()
-
-    # ดึง world state ปัจจุบัน
+    # 🧠 โหลด world state ปัจจุบัน
     judgment = get_judgment()
 
-    # 🔎 พยายาม extract outcome จาก AI
-    # (รองรับหลาย format ในอนาคต)
+    # 🔎 extract outcome จาก AI (robust)
+    if not isinstance(ai_result, dict):
+        print("EVOLVE SKIP: ai_result is not dict ->", type(ai_result))
+        return judgment
+
     outcome = {
         "score": ai_result.get("score", 0),
         "global_risk": ai_result.get("global_risk", 0.5)
