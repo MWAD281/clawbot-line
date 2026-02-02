@@ -1,25 +1,24 @@
 # agents/ceo_alpha.py
-# CEO Alpha — cautious, risk-first
+# CEO Alpha — Crisis Hawk
 
-def ceo_alpha(world_input: str, world_state: dict):
-    """
-    มองโลกในมุมระวังสูงสุด
-    """
+def ceo_alpha(user_input: str, world_state: dict):
     risk = world_state.get("global_risk", "MEDIUM")
 
     if risk in ["HIGH", "LATENT_SYSTEMIC_RISK"]:
-        stance = "DEFENSIVE"
-        vote = "HIGH"
-        reason = "Systemic risk still embedded in global structure"
-    else:
-        stance = "CAUTIOUS"
-        vote = "MEDIUM"
-        reason = "Risk not resolved, downside asymmetric"
+        return {
+            "agent_id": "CEO_ALPHA",
+            "faction": "CRISIS",
+            "global_risk": "HIGH",
+            "confidence": 0.75,
+            "stance": "DEFENSIVE",
+            "reason": "Systemic fragility and tail risks remain unresolved"
+        }
 
     return {
-        "agent_id": "CEO_ALPHA",   # ← แก้ตรงนี้
-        "global_risk": vote,
-        "stance": stance,
-        "confidence": 0.7,
-        "reason": reason
+        "agent_id": "CEO_ALPHA",
+        "faction": "CRISIS",
+        "global_risk": "MEDIUM",
+        "confidence": 0.65,
+        "stance": "CAUTIOUS",
+        "reason": "Risk asymmetric despite surface stability"
     }
