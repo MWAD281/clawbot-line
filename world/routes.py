@@ -1,35 +1,46 @@
 # world/routes.py
 
 from fastapi import APIRouter
-from memory.judgment_state import get_judgment
 from evolution.agent_evolver import evolve_agents
-from world.outcome_schema import normalize_outcome
+from memory.judgment_state import get_judgment
+from world.normalize import normalize_outcome
 
 router = APIRouter()
 
 
+@router.get("/")
+def world_state():
+    """
+    ดู world state ปัจจุบัน
+    """
+    return get_judgment()
+
+
 @router.post("/world/evolve")
-def weekly_evolve(raw_outcome: dict):
+def weekly_evolve(raw_input: dict):
     """
-    เรียกสัปดาห์ละครั้ง / หลังเหตุการณ์ใหญ่
-    เพื่อให้ระบบ AI ปรับตัว (Evolution Trigger)
+    รับ input จากโลก (text หรือ outcome)
     """
 
-    # 1️⃣ Normalize outcome จาก council / world
-    outcome = normalize_outcome(raw_outcome)
+    # 🧠 ถ้ามี text → แปลงเป็น outcome แบบ heuristic ชั่วคราว
+    if "text" in raw_input:
+        text = raw_input["text"]
 
-    # 2️⃣ 🔁 OPTION A: map API schema -> internal schema
-    # เพื่อให้ memory / evolver ใช้ key เดียวกัน
-    outcome["global_risk"] = outcome.pop("risk")
+        outcome = {
+            "score": -0.6 if "เสี่ยง" in text else 0.2,
+            "global_risk": 0.8 if ("สงคราม" in text or "ดอกเบี้ย" in text) else 0.4
+        }
+    else:
+        # กรณีส่ง outcome มาโดยตรง
+        outcome = normalize_outcome(raw_input)
 
-    # 3️⃣ ดึง judgment ปัจจุบันของโลก
     judgment = get_judgment()
-
-    # 4️⃣ ให้ agent ทั้งระบบ evolve ตามผลลัพธ์
     evolve_agents(judgment, outcome)
 
-    # 5️⃣ ส่งผลลัพธ์กลับ
     return {
         "status": "EVOLUTION_COMPLETE",
-        "outcome": outcome
+        "input": raw_input,
+        "outcome": outcome,
+        "worldview": judgment.get("worldview"),
+        "confidence": judgment.get("confidence")
     }
