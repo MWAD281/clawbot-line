@@ -28,7 +28,7 @@ def evolve_from_ai(ai_text: str):
         "inflation easing",
         "liquidity improving",
         "policy support",
-        "risk stabilizing",
+        "risk stabilizing", 
         "no systemic risk"
     ]):
         EVOLUTION_BUFFER["stability_hits"] += 1
