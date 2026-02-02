@@ -8,33 +8,21 @@ def ceo_beta(user_input: str, world_state: dict):
 
     global_risk = world_state.get("global_risk", "MEDIUM")
 
-    # agents/ceo_beta.py
-
-def ceo_beta(user_input: str, world_state: dict):
-    return {
-        "agent_id": "CEO_BETA",
-        "global_risk": "MEDIUM",
-        "confidence": 0.7,
-        "stance": "OPPORTUNISTIC",
-        "reason": (
-            "Risk is real but market pricing already reflects fear. "
-            "Liquidity pockets and mispricing emerging."
-        )
-    }
-    
-    # ถ้าโลกกลัวมาก → Beta จะสวน
+    # 🔥 ถ้าโลกกลัวมาก → Beta จะสวน
     if global_risk in ["HIGH", "LATENT_SYSTEMIC_RISK"]:
         return {
-            "ceo": "BETA",
+            "agent_id": "CEO_BETA",
             "global_risk": "MEDIUM",
             "confidence": 0.7,
-            "reason": "Panic risk elevated, opportunity forming"
+            "stance": "OPPORTUNISTIC",
+            "reason": "Panic elevated; mispricing and liquidity pockets emerging"
         }
 
-    # ถ้าโลกดูนิ่ง → Beta จะเริ่มระวัง
+    # 🔥 ถ้าโลกดูนิ่ง / complacent → Beta จะเริ่มระวัง
     return {
-        "ceo": "BETA",
+        "agent_id": "CEO_BETA",
         "global_risk": "LOW",
         "confidence": 0.6,
-        "reason": "Risk premium compressed, upside limited"
+        "stance": "OPPORTUNISTIC",
+        "reason": "Risk premium compressed; upside limited vs downside"
     }
