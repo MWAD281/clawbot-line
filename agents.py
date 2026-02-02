@@ -1,13 +1,7 @@
 import requests
 import os
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_URL = "https://api.openai.com/v1/responses"
-
-HEADERS = {
-    "Authorization": f"Bearer {OPENAI_API_KEY}",
-    "Content-Type": "application/json"
-}
 
 # ===== Agent Prompts =====
 
@@ -25,9 +19,14 @@ AGENTS = {
     )
 }
 
-# ===== Call single agent =====
+# ===== Call single agent (เวอร์ชันแก้แล้ว) =====
 
 def call_agent(agent_name: str, user_text: str) -> str:
+    headers = {
+        "Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}",
+        "Content-Type": "application/json"
+    }
+
     payload = {
         "model": "gpt-4.1-mini",
         "input": [
@@ -36,7 +35,12 @@ def call_agent(agent_name: str, user_text: str) -> str:
         ]
     }
 
-    r = requests.post(OPENAI_URL, headers=HEADERS, json=payload)
+    r = requests.post(
+        OPENAI_URL,
+        headers=headers,
+        json=payload,
+        timeout=20
+    )
     r.raise_for_status()
 
     return r.json()["output"][0]["content"][0]["text"]
@@ -50,8 +54,8 @@ def run_investor_swarm(user_text: str) -> str:
     for agent in ["macro", "risk", "asset", "investor", "skeptic"]:
         opinions[agent] = call_agent(agent, user_text)
 
-    synthesis_input = "\n\n".join(
-        f"{k.upper()}:\n{v}" for k, v in opinions.items()
+    synthesis_input = "\n\n---\n\n".join(
+        f"[{k.upper()}]\n{v}" for k, v in opinions.items()
     )
 
     return call_agent("synth", synthesis_input)
