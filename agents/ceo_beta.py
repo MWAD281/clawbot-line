@@ -7,11 +7,11 @@ def ceo_beta(user_input: str, world_state: dict):
     if risk in ["HIGH", "LATENT_SYSTEMIC_RISK"]:
         return {
             "agent_id": "CEO_BETA",
-            "faction": "LIQUIDITY",
+            "faction": "RISK_ON",
             "global_risk": "MEDIUM",
             "confidence": 0.7,
             "stance": "OPPORTUNISTIC",
-            "reason": "Panic creates liquidity pockets and mispricing"
+            "reason": "Panic elevated; mispricing emerging"
         }
 
     return {
