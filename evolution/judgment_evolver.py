@@ -1,6 +1,6 @@
 # evolution/judgment_evolver.py
 
-from memory.judgment_state import overwrite_judgment, get_judgment
+from memory.judgment_state import get_judgment, overwrite_judgment
 
 EVOLUTION_BUFFER = {
     "risk_hits": 0,
@@ -9,9 +9,11 @@ EVOLUTION_BUFFER = {
 
 def evolve_from_ai(ai_text: str):
     text = ai_text.lower()
-    inertia = JUDGMENT_STATE["inertia"]
+    state = get_judgment()
 
-    # 🔥 ฝั่งแตก
+    inertia = state.get("inertia", 1.0)
+
+    # 🔥 ฝั่งสัญญาณโลกแตก
     if any(k in text for k in [
         "systemic risk",
         "liquidity shock",
@@ -21,7 +23,7 @@ def evolve_from_ai(ai_text: str):
     ]):
         EVOLUTION_BUFFER["risk_hits"] += 1
 
-    # 🧊 ฝั่งฟื้น
+    # 🧊 ฝั่งสัญญาณฟื้น
     if any(k in text for k in [
         "soft landing",
         "inflation easing",
@@ -32,26 +34,31 @@ def evolve_from_ai(ai_text: str):
     ]):
         EVOLUTION_BUFFER["stability_hits"] += 1
 
-    # 🔥 โลกแตกง่าย
+    # 🔥 โลกแตกง่าย (fear-first)
     if EVOLUTION_BUFFER["risk_hits"] >= max(2, int(2 * inertia)):
-        update_judgment(
-            global_risk="HIGH",
-            worldview="FRAGILE",
-            stance="DEFENSIVE",
-            inertia_delta=+0.3
-        )
+        state.update({
+            "global_risk": "HIGH",
+            "worldview": "FRAGILE",
+            "stance": "DEFENSIVE",
+            "inertia": inertia + 0.3
+        })
+
+        overwrite_judgment(state)
 
         EVOLUTION_BUFFER["risk_hits"] = 0
         EVOLUTION_BUFFER["stability_hits"] = 0
+        return
 
     # 🧊 โลกฟื้นยาก
     if EVOLUTION_BUFFER["stability_hits"] >= int(3 * inertia):
-        update_judgment(
-            global_risk="MEDIUM",
-            worldview="STABLE",
-            stance="NEUTRAL",
-            inertia_delta=-0.2
-        )
+        state.update({
+            "global_risk": "MEDIUM",
+            "worldview": "STABLE",
+            "stance": "NEUTRAL",
+            "inertia": max(0.5, inertia - 0.2)
+        })
+
+        overwrite_judgment(state)
 
         EVOLUTION_BUFFER["stability_hits"] = 0
         EVOLUTION_BUFFER["risk_hits"] = max(
