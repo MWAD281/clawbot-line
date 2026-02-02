@@ -20,19 +20,12 @@ def council_decide(world_input: dict):
         "HIGH": 0.0
     }
 
-    for v in ceo_votes:
-        agent_id = v.get("agent_id")
-        risk = v.get("global_risk", "MEDIUM")
-
-        if not agent_id or is_muted(agent_id):
-            continue   # 🔇 CEO ที่น้ำหนักต่ำ = ไม่มีเสียง
-
-        weight = get_weight(agent_id)
-        confidence = v.get("confidence", 0.5)
-
-        risk_score[risk] += confidence * weight
-
-    final_risk = max(risk_score, key=risk_score.get)
+    # 🧠 Decide final risk
+    if all(v == 0 for v in risk_score.values()):
+        # 🧟 fallback: ไม่มี CEO ที่ active
+        final_risk = world_state.get("global_risk", "MEDIUM")
+    else:
+        final_risk = max(risk_score, key=risk_score.get)
 
     overwrite_judgment({
         "global_risk": final_risk,
