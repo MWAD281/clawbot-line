@@ -7,11 +7,11 @@ def ceo_alpha(user_input: str, world_state: dict):
     if risk in ["HIGH", "LATENT_SYSTEMIC_RISK"]:
         return {
             "agent_id": "CEO_ALPHA",
-            "faction": "CRISIS",
-            "global_risk": "HIGH",
-            "confidence": 0.75,
-            "stance": "DEFENSIVE",
-            "reason": "Systemic fragility and tail risks remain unresolved"
+            "faction": "RISK_OFF",
+            "global_risk": vote,
+            "stance": stance,
+            "confidence": 0.7,
+            "reason": reason
         }
 
     return {
