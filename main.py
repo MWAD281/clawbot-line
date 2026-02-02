@@ -5,7 +5,7 @@ import base64
 import requests
 from fastapi import FastAPI, Request, HTTPException
 
-from agents import run_investor_swarm
+from agents.investor_agents import run_investor_swarm
 from agents.finance_agents import run_finance_swarm
 
 app = FastAPI()
