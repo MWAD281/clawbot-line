@@ -6,7 +6,7 @@ def evolve_judgment(judgment: dict, outcome: dict) -> dict:
     """
 
     score = outcome.get("score", 0)
-    global_risk = outcome.get("global_risk", 0.5)
+    global_risk = outcome.get("global_risk", outcome.get("risk", 0.5))
 
     # ค่า default
     judgment.setdefault("worldview", "neutral")
