@@ -165,7 +165,10 @@ def call_openai(user_text: str, mode: str) -> str:
     r.raise_for_status()
 
     data = r.json()
-    return data["output"][0]["content"][0]["text"]
+    return {
+        "text": data["output"][0]["content"][0]["text"],
+        "raw": data
+    }
 
 
 def reply_line(reply_token: str, text: str):
