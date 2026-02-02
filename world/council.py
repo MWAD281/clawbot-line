@@ -1,30 +1,12 @@
 # world/council.py
 
-from agents.investor_agents import get_investor_views
-from agents.finance_agents import get_finance_views
 from memory.judgment_state import overwrite_judgment, get_judgment
 from world.debate import run_ceo_debate
-
-from agents.ceo_alpha import ceo_alpha
-
-def run_ceo_debate(user_input: str, world_state: dict):
-    """
-    เรียก CEO ทุกคนมาโหวต
-    (ตอนนี้ยังมีแค่ Alpha)
-    """
-
-    votes = []
-
-    votes.append(
-        ceo_alpha(user_input, world_state)
-    )
-
-    return votes
 
 def council_decide(world_input: dict):
     world_state = get_judgment()
 
-    # 🔥 CEO Debate
+    # 🔥 CEO Debate (เรียกจาก debate engine เท่านั้น)
     ceo_votes = run_ceo_debate(
         world_input.get("text", ""),
         world_state
