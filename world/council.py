@@ -8,7 +8,7 @@ from world.debate import run_ceo_debate
 def council_decide(world_input: dict):
     world_state = get_judgment()
 
-    # 🔥 CEO Debate (เรียกจาก debate engine เท่านั้น)
+    # 🔥 CEO Debate
     ceo_votes = run_ceo_debate(
         world_input.get("text", ""),
         world_state
@@ -19,6 +19,19 @@ def council_decide(world_input: dict):
         "MEDIUM": 0.0,
         "HIGH": 0.0
     }
+
+    # 🧠 Accumulate weighted votes
+    for v in ceo_votes:
+        agent_id = v.get("agent_id")
+        risk = v.get("global_risk", "MEDIUM")
+
+        if not agent_id or is_muted(agent_id):
+            continue   # 🔇 muted CEO = no vote
+
+        weight = get_weight(agent_id)
+        confidence = v.get("confidence", 0.5)
+
+        risk_score[risk] += confidence * weight
 
     # 🧠 Decide final risk
     if all(v == 0 for v in risk_score.values()):
