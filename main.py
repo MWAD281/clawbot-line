@@ -10,6 +10,7 @@ from agents.finance_agents import run_finance_swarm
 from memory.judgment_state import get_judgment
 from evolution.judgment_evolver import evolve_from_ai
 from world.routes import router as world_router
+from memory.judgment_state import get_judgment, overwrite_judgment
 
 app = FastAPI()
 app.include_router(world_router)
@@ -196,8 +197,6 @@ def world_state():
 # -------------------------
 # PRE-BIRTH FEAR INJECTION
 # -------------------------
-
-from memory.judgment_state import overwrite_judgment
 
 @app.post("/world/fear")
 def inject_prebirth_fear():
