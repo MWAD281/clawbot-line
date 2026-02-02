@@ -126,7 +126,21 @@ def call_openai(user_text: str, mode: str) -> str:
         "Content-Type": "application/json"
     }
 
+    # 🔥 1. อ่าน memory โลก
+    judgment = get_judgment()
+
+    # 🔥 2. prompt หลัก
     system_prompt = build_system_prompt(mode)
+
+    # 🔥 3. ฝัง judgment state เข้าไป
+    system_prompt = (
+        system_prompt
+        + "\n\n[GLOBAL JUDGMENT STATE]\n"
+        + f"Global Risk: {judgment['global_risk']}\n"
+        + f"Worldview: {judgment['worldview']}\n"
+        + f"Stance: {judgment['stance']}\n"
+        + "ใช้ state นี้เป็น baseline ห้ามขัดแย้งโดยไม่อธิบาย"
+    )
 
     payload = {
         "model": "gpt-4.1-mini",
