@@ -20,18 +20,22 @@ def council_decide(world_input: dict):
         "HIGH": 0.0
     }
 
-    # 🧠 Accumulate weighted votes
+    faction_score = {}
+
     for v in ceo_votes:
         agent_id = v.get("agent_id")
+        faction = v.get("faction", "UNKNOWN")
         risk = v.get("global_risk", "MEDIUM")
 
         if not agent_id or is_muted(agent_id):
-            continue   # 🔇 muted CEO = no vote
+            continue
 
         weight = get_weight(agent_id)
         confidence = v.get("confidence", 0.5)
 
         risk_score[risk] += confidence * weight
+        faction_score.setdefault(faction, 0.0)
+        faction_score[faction] += confidence * weight
 
     # 🧠 Decide final risk
     if all(v == 0 for v in risk_score.values()):
@@ -50,6 +54,8 @@ def council_decide(world_input: dict):
 
     return {
         "final_risk": final_risk,
+        "dominant_faction": max(faction_score, key=faction_score.get),
         "votes": ceo_votes,
-        "score": risk_score
+        "score": risk_score,
+        "factions": faction_score
     }
