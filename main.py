@@ -17,26 +17,23 @@ app.include_router(world_router)
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
 
-
 LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply"
 OPENAI_URL = "https://api.openai.com/v1/responses"
 
-# ===== Trigger Logic =====
+# =========================
+# Trigger Logic
+# =========================
 
 def detect_mode(user_text: str) -> str:
     text = user_text.lower()
 
-    # 🔥 คำถามเชิง abstract / ภาพโลก
-    if "โลก" in text or "น่ากลัว" in text:
-        return "deep"
-
-    if "ลึก" in text:
+    if "โลก" in text or "น่ากลัว" in text or "ลึก" in text:
         return "deep"
     if any(k in text for k in ["ลงทุน", "สินทรัพย์", "หุ้น", "ดอกเบี้ย"]):
         return "investor"
     if "คริปโต" in text:
         return "crypto"
-    if "ทอง" in text or "commodity" in text:
+    if "ทอง" in text:
         return "commodity"
     if "จับตา" in text:
         return "watchlist"
@@ -45,51 +42,44 @@ def detect_mode(user_text: str) -> str:
 
     return "short_sharp"
 
+
 def build_system_prompt(mode: str) -> str:
     if mode == "deep":
         return (
             "คุณคือ ClawBot นักวิเคราะห์ macro เชิงระบบ "
-            "คิดแบบนักลงทุนระยะยาว ไม่อธิบายความหมายคำถาม "
-            "เข้าภาพใหญ่ของโลกทันที "
-            "วิเคราะห์ตามลำดับ: Macro → Risk → Transmission → Asset Impact → What to Watch "
-            "เชื่อม geopolitics, economy, liquidity, climate, technology "
-            "ใช้ภาษาไทยเป็นหลัก แทรก English key terms ที่จำเป็นเท่านั้น "
+            "วิเคราะห์ Macro → Risk → Transmission → Asset Impact → What to Watch "
             "ไม่ปลอบใจ ไม่ให้คำแนะนำซื้อขายตรง "
-            "ตอนท้ายต้องมีหัวข้อชัดเจนว่า 'Judgment:' "
-            "และสรุปโลกตอนนี้ด้วย 1–2 ประโยคแบบฟันธง ห้ามกลาง ๆ "
-            "Judgment ต้องเลือก stance เดียว ห้ามมีคำว่า 'ทั้งนี้', 'อย่างไรก็ตาม', หรือ 'ขึ้นอยู่กับ'"
+            "ตอนท้ายต้องมีหัวข้อ 'Judgment:' และฟันธง"
         )
-        
+
     if mode == "investor":
         return (
-            "คุณคือ ClawBot ในมุมมองนักลงทุนเชิงระบบ "
+            "คุณคือ ClawBot มุมมองนักลงทุนเชิงระบบ "
             "โฟกัส Macro → Risk → Asset Impact → Positioning "
-            "ไม่ให้คำแนะนำซื้อขายตรง "
-              "เน้น scenario, framework และสิ่งที่ต้องจับตา "
-            "ใช้ภาษาไทยเป็นหลัก แทรก English key terms ที่จำเป็น"
+            "ไม่ให้คำแนะนำซื้อขายตรง"
         )
 
     if mode == "ultra_short":
         return (
-             "ตอบ 1 ประโยคเท่านั้น "
-            "ต้องมีมุมมองชัด (judgment) "
-            "ไม่ใช้ภาษาปลอบใจ ไม่กลาง ๆ "
-            "เน้น macro risk หรือ implication"
+            "ตอบ 1 ประโยคเท่านั้น "
+            "ต้องมี judgment ชัด ไม่กลาง ๆ"
         )
 
     if mode == "watchlist":
-        return "สรุปเป็น bullet สั้น ๆ 2–3 ประเด็นที่ควรจับตา"
+        return "สรุป bullet สั้น ๆ 2–3 ประเด็นที่ควรจับตา"
 
-    # กันพัง + default personality
-    return "ตอบแบบสั้น กระชับ แต่คม โฟกัส macro และความเสี่ยงของโลก"
+    return "ตอบสั้น กระชับ คม โฟกัส macro risk"
 
+
+# =========================
+# LINE WEBHOOK
+# =========================
 
 @app.post("/line/webhook")
 async def line_webhook(request: Request):
     body = await request.body()
     x_line_signature = request.headers.get("X-Line-Signature")
 
-    # verify signature
     hash = hmac.new(
         LINE_CHANNEL_SECRET.encode("utf-8"),
         body,
@@ -103,49 +93,62 @@ async def line_webhook(request: Request):
     data = await request.json()
 
     for event in data.get("events", []):
-        if event["type"] == "message":
-            reply_token = event["replyToken"]
-            user_text = event["message"]["text"]
+        if event.get("type") != "message":
+            continue
 
-            # Detect mode
-            mode = detect_mode(user_text)
+        reply_token = event["replyToken"]
+        user_text = event["message"].get("text", "")
 
-            # Call appropriate bot
-            if mode == "investor":
-                ai_text = call_openai(user_text, mode)
-            elif mode in ["crypto", "commodity", "watchlist"]:
+        mode = detect_mode(user_text)
+
+        # 🤖 CALL AI (กันพัง)
+        try:
+            if mode in ["crypto", "commodity", "watchlist"]:
                 ai_text = run_finance_swarm(user_text)
+                ai_raw = None
             else:
-                ai_text = call_openai(user_text, mode)
+                result = call_openai(user_text, mode)
+                ai_text = result["text"]
+                ai_raw = result["raw"]
+        except Exception as e:
+            print("AI ERROR:", e)
+            ai_text = "ระบบกำลังประมวลผลหนัก ลองถามใหม่อีกครั้ง"
+            ai_raw = None
 
-            # 🧬 EVOLVE worldview
-            evolve_from_ai(ai_text)
+        # 🧬 EVOLVE (ไม่ให้ webhook พัง)
+        try:
+            if ai_raw:
+                evolve_from_ai(user_text, ai_raw)
+        except Exception as e:
+            print("EVOLVE ERROR:", e)
 
-            # reply to user
+        # 📤 REPLY LINE
+        try:
             reply_line(reply_token, ai_text)
+        except Exception as e:
+            print("LINE ERROR:", e)
 
     return {"ok": True}
 
-def call_openai(user_text: str, mode: str) -> str:
+
+# =========================
+# OPENAI
+# =========================
+
+def call_openai(user_text: str, mode: str) -> dict:
     headers = {
         "Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}",
         "Content-Type": "application/json"
     }
 
-    # 🔥 1. อ่าน memory โลก
     judgment = get_judgment()
-
-    # 🔥 2. prompt หลัก
     system_prompt = build_system_prompt(mode)
 
-    # 🔥 3. ฝัง judgment state เข้าไป
-    system_prompt = (
-        system_prompt
-        + "\n\n[GLOBAL JUDGMENT STATE]\n"
-        + f"Global Risk: {judgment['global_risk']}\n"
-        + f"Worldview: {judgment['worldview']}\n"
-        + f"Stance: {judgment['stance']}\n"
-        + "ใช้ state นี้เป็น baseline ห้ามขัดแย้งโดยไม่อธิบาย"
+    system_prompt += (
+        "\n\n[GLOBAL JUDGMENT STATE]\n"
+        f"Global Risk: {judgment['global_risk']}\n"
+        f"Worldview: {judgment['worldview']}\n"
+        f"Stance: {judgment['stance']}\n"
     )
 
     payload = {
@@ -171,6 +174,10 @@ def call_openai(user_text: str, mode: str) -> str:
     }
 
 
+# =========================
+# LINE REPLY
+# =========================
+
 def reply_line(reply_token: str, text: str):
     headers = {
         "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}",
@@ -187,6 +194,10 @@ def reply_line(reply_token: str, text: str):
     requests.post(LINE_REPLY_URL, headers=headers, json=payload)
 
 
+# =========================
+# HEALTH / WORLD
+# =========================
+
 @app.get("/")
 def health_check():
     return {"status": "ClawBot alive"}
@@ -195,10 +206,6 @@ def health_check():
 def world_state():
     return get_judgment()
 
-
-# -------------------------
-# PRE-BIRTH FEAR INJECTION
-# -------------------------
 
 @app.post("/world/fear")
 def inject_prebirth_fear():
@@ -210,8 +217,4 @@ def inject_prebirth_fear():
     }
 
     overwrite_judgment(fear_state)
-
-    return {
-        "status": "FEAR IMPRINTED",
-        "state": fear_state
-    }
+    return {"status": "FEAR IMPRINTED", "state": fear_state}
