@@ -9,21 +9,24 @@ EVOLUTION_BUFFER = {
 
 def evolve_from_ai(ai_text: str):
     text = ai_text.lower()
-    state = get_judgment()
 
+    # ✅ ดึง state ล่าสุดจริง ๆ
+    state = get_judgment()
     inertia = state.get("inertia", 1.0)
 
-    # 🔥 ฝั่งสัญญาณโลกแตก
+    # 🔥 trigger ฝั่งเสี่ยง
     if any(k in text for k in [
         "systemic risk",
         "liquidity shock",
         "credit stress",
         "collapse",
-        "crisis"
+        "crisis",
+        "bank run",
+        "contagion"
     ]):
         EVOLUTION_BUFFER["risk_hits"] += 1
 
-    # 🧊 ฝั่งสัญญาณฟื้น
+    # 🧊 trigger ฝั่งฟื้น
     if any(k in text for k in [
         "soft landing",
         "inflation easing",
@@ -34,31 +37,26 @@ def evolve_from_ai(ai_text: str):
     ]):
         EVOLUTION_BUFFER["stability_hits"] += 1
 
-    # 🔥 โลกแตกง่าย (fear-first)
-    if EVOLUTION_BUFFER["risk_hits"] >= max(2, int(2 * inertia)):
-        state.update({
+    # 🔥 โลกแตก "ง่ายขึ้น" เมื่อ inertia สูง
+    if EVOLUTION_BUFFER["risk_hits"] >= max(1, int(2 * inertia)):
+        overwrite_judgment({
             "global_risk": "HIGH",
-            "worldview": "FRAGILE",
+            "worldview": "FRAGILE_SYSTEM",
             "stance": "DEFENSIVE",
             "inertia": inertia + 0.3
         })
 
-        overwrite_judgment(state)
-
         EVOLUTION_BUFFER["risk_hits"] = 0
         EVOLUTION_BUFFER["stability_hits"] = 0
-        return
 
-    # 🧊 โลกฟื้นยาก
-    if EVOLUTION_BUFFER["stability_hits"] >= int(3 * inertia):
-        state.update({
+    # 🧊 โลกจะสงบ "ยากมาก" ถ้า inertia สูง
+    if EVOLUTION_BUFFER["stability_hits"] >= int(4 * inertia):
+        overwrite_judgment({
             "global_risk": "MEDIUM",
-            "worldview": "STABLE",
+            "worldview": "STABILIZING_SYSTEM",
             "stance": "NEUTRAL",
-            "inertia": max(0.5, inertia - 0.2)
+            "inertia": max(1.0, inertia - 0.2)
         })
-
-        overwrite_judgment(state)
 
         EVOLUTION_BUFFER["stability_hits"] = 0
         EVOLUTION_BUFFER["risk_hits"] = max(
