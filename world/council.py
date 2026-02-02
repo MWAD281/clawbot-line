@@ -19,8 +19,13 @@ def council_decide(world_input: dict):
     }
 
     for v in ceo_votes:
+        agent_id = v.get("agent_id")
         risk = v.get("global_risk", "MEDIUM")
-        risk_score[risk] += v.get("confidence", 0.5)
+
+        weight = get_weight(agent_id)
+        confidence = v.get("confidence", 0.5)
+
+        risk_score[risk] += confidence * weight
 
     final_risk = max(risk_score, key=risk_score.get)
 
