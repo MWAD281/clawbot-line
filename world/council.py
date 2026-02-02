@@ -36,7 +36,8 @@ def council_decide(world_input: dict):
         "global_risk": final_risk,
         "worldview": "FRAGILE_COMPLEX_SYSTEM" if final_risk == "HIGH" else "MIXED",
         "stance": "CAUTIOUS" if final_risk != "LOW" else "NEUTRAL",
-        "source": "COUNCIL"
+        "source": "COUNCIL",
+        "last_votes": all_views
     })
 
     return {
