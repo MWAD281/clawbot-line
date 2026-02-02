@@ -1,18 +1,20 @@
 # world/council.py
 
 from memory.judgment_state import overwrite_judgment, get_judgment
-from memory.agent_weights import get_weight, is_muted
+from memory.agent_weights import get_weight, is_muted, adjust_weight
+from memory.agent_lifecycle import record_performance, should_die
 from world.debate import run_ceo_debate
 from world.regime import apply_regime_shift
 
 
 def council_decide(world_input: dict):
     """
-    Central decision engine ของโลก
-    - รวมเสียง CEO
+    Central decision engine ของโลก (Phase 10.1 + 11)
+    - CEO มี personality + memory
     - ถ่วงน้ำหนักด้วย Darwinism
-    - ตรวจ faction dominance
-    - trigger regime shift
+    - CEO ตาย / mute ได้
+    - faction dominance
+    - regime shift
     """
 
     world_state = get_judgment()
@@ -31,19 +33,20 @@ def council_decide(world_input: dict):
 
     faction_score = {}
 
+    extinction_events = []
+
     # 🧮 Aggregate votes
     for v in ceo_votes:
         agent_id = v.get("agent_id")
         faction = v.get("faction", "UNKNOWN")
         risk = v.get("global_risk", "MEDIUM")
+        confidence = v.get("confidence", 0.5)
 
         # 🔇 agent ที่ถูก mute ไม่มีเสียง
         if not agent_id or is_muted(agent_id):
             continue
 
         weight = get_weight(agent_id)
-        confidence = v.get("confidence", 0.5)
-
         impact = confidence * weight
 
         # รวมคะแนน risk
@@ -52,6 +55,14 @@ def council_decide(world_input: dict):
         # รวมคะแนน faction
         faction_score.setdefault(faction, 0.0)
         faction_score[faction] += impact
+
+        # 🧬 Darwinism: บันทึกผลงาน
+        record_performance(agent_id, impact)
+
+        # ☠️ ตรวจการตายของ CEO
+        if should_die(agent_id):
+            adjust_weight(agent_id, -10)  # mute ถาวร
+            extinction_events.append(agent_id)
 
     # 🧠 Decide final risk
     if all(v == 0 for v in risk_score.values()):
@@ -66,7 +77,7 @@ def council_decide(world_input: dict):
         if faction_score else "UNKNOWN"
     )
 
-    # 🌋 Regime Shift (Phase 7)
+    # 🌋 Regime Shift
     apply_regime_shift(dominant_faction)
 
     # 🌍 Commit world judgment
@@ -84,6 +95,7 @@ def council_decide(world_input: dict):
         ),
         "source": "CEO_DEBATE",
         "dominant_faction": dominant_faction,
+        "extinctions": extinction_events,
         "last_votes": ceo_votes
     })
 
@@ -92,5 +104,6 @@ def council_decide(world_input: dict):
         "dominant_faction": dominant_faction,
         "votes": ceo_votes,
         "risk_score": risk_score,
-        "factions": faction_score
+        "factions": faction_score,
+        "extinctions": extinction_events
     }
