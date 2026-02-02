@@ -5,11 +5,13 @@ import base64
 import requests
 from fastapi import FastAPI, Request, HTTPException
 
+from agents import run_investor_swarm
+
 app = FastAPI()
 
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
 
 LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply"
 OPENAI_URL = "https://api.openai.com/v1/responses"
@@ -80,7 +82,7 @@ async def line_webhook(request: Request):
     ).digest()
     signature = base64.b64encode(hash).decode()
 
-    if signature != x_line_signature:
+    if not hmac.compare_digest(signature, x_line_signature):
         raise HTTPException(status_code=400, detail="Invalid signature")
 
     data = await request.json()
@@ -91,14 +93,19 @@ async def line_webhook(request: Request):
             user_text = event["message"]["text"]
 
             mode = detect_mode(user_text)
-            ai_text = call_openai(user_text, mode)
+            
+            if mode == "investor":
+                ai_text = run_investor_swarm(user_text)
+            else:
+                ai_text = call_openai(user_text, mode)
+
             reply_line(reply_token, ai_text)
 
     return {"ok": True}
 
 def call_openai(user_text: str, mode: str) -> str:
     headers = {
-        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}",
         "Content-Type": "application/json"
     }
 
@@ -112,7 +119,12 @@ def call_openai(user_text: str, mode: str) -> str:
         ]
     }
 
-    r = requests.post(OPENAI_URL, headers=headers, json=payload)
+    r = requests.post(
+        OPENAI_URL,
+        headers=headers,
+        json=payload,
+        timeout=20
+    )
     r.raise_for_status()
 
     data = r.json()
