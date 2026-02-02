@@ -1,27 +1,54 @@
 # evolution/judgment_evolver.py
 
-def evolve_judgment(judgment: dict, outcome: dict) -> dict:
-    """
-    ปรับ worldview ของระบบจาก outcome โลกจริง
-    """
+from memory.judgment_state import get_judgment, overwrite_judgment
 
-    score = outcome.get("score", 0)
-    global_risk = outcome.get("global_risk", outcome.get("risk", 0.5))
+EVOLUTION_BUFFER = {
+    "risk_hits": 0,
+    "stability_hits": 0
+}
 
-    # ค่า default
-    judgment.setdefault("worldview", "neutral")
-    judgment.setdefault("confidence", 0.5)
+def evolve_from_ai(ai_text: str):
+    text = ai_text.lower()
+    state = get_judgment()
 
-    # 🔁 Logic การเปลี่ยน worldview
-    if score < -0.5 or global_risk > 0.7:
-        judgment["worldview"] = "defensive"
-        judgment["confidence"] = max(0.1, judgment["confidence"] - 0.1)
+    inertia = state.get("inertia", 1.0)
 
-    elif score > 0.5 and global_risk < 0.4:
-        judgment["worldview"] = "aggressive"
-        judgment["confidence"] = min(0.9, judgment["confidence"] + 0.1)
+    if any(k in text for k in [
+        "systemic risk",
+        "liquidity shock",
+        "credit stress",
+        "collapse",
+        "crisis",
+        "bank run",
+        "contagion"
+    ]):
+        EVOLUTION_BUFFER["risk_hits"] += 1
 
-    else:
-        judgment["worldview"] = "neutral"
+    if any(k in text for k in [
+        "soft landing",
+        "inflation easing",
+        "liquidity improving",
+        "policy support",
+        "risk stabilizing"
+    ]):
+        EVOLUTION_BUFFER["stability_hits"] += 1
 
-    return judgment
+    if EVOLUTION_BUFFER["risk_hits"] >= int(2 * inertia):
+        overwrite_judgment({
+            "global_risk": "HIGH",
+            "worldview": "SYSTEMIC_STRESS",
+            "stance": "DEFENSIVE",
+            "inertia": inertia + 0.5
+        })
+        EVOLUTION_BUFFER["risk_hits"] = 0
+        EVOLUTION_BUFFER["stability_hits"] = 0
+        return
+
+    if EVOLUTION_BUFFER["stability_hits"] >= int(4 * inertia):
+        overwrite_judgment({
+            "global_risk": "MEDIUM",
+            "worldview": "STABILIZING",
+            "stance": "CAUTIOUS",
+            "inertia": max(1.0, inertia - 0.1)
+        })
+        EVOLUTION_BUFFER["stability_hits"] = 0
