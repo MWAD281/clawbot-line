@@ -1,29 +1,24 @@
 # agents/ceo_gamma.py
-# CEO Gamma — Tail Risk / Doom Scanner
+# CEO Gamma — Trend & Momentum
 
 def ceo_gamma(user_input: str, world_state: dict):
-    """
-    มองหาความเสี่ยงแบบหางซ้าย (rare but fatal)
-    """
-
-    global_risk = world_state.get("global_risk", "MEDIUM")
     inertia = world_state.get("inertia", 1.0)
 
-    # ถ้าโลกดูนิ่ง แต่ inertia สูง → น่ากลัว
-    if global_risk in ["LOW", "MEDIUM"] and inertia >= 1.5:
+    if inertia > 2.0:
         return {
             "agent_id": "CEO_GAMMA",
+            "faction": "TREND",
             "global_risk": "HIGH",
-            "confidence": 0.4,
-            "stance": "ALERT",
-            "reason": "Complacency with rising inertia increases tail risk"
+            "confidence": 0.65,
+            "stance": "MOMENTUM_SHORT",
+            "reason": "High inertia implies trend continuation and reflexivity"
         }
 
-    # ถ้าโลกดูแย่อยู่แล้ว → Gamma จะไม่ตะโกน
     return {
         "agent_id": "CEO_GAMMA",
-        "global_risk": global_risk,
-        "confidence": 0.3,
-        "stance": "OBSERVE",
-        "reason": "Tail risk present but not accelerating"
+        "faction": "TREND",
+        "global_risk": "MEDIUM",
+        "confidence": 0.6,
+        "stance": "MOMENTUM_LONG",
+        "reason": "No strong inertia; trend fragile"
     }
