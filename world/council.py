@@ -28,7 +28,7 @@ def council_decide(world_input: dict):
         if risk not in risk_score:
             risk = "MEDIUM"
 
-    risk_score[risk] += v.get("weight", 1.0)
+        risk_score[risk] += v.get("weight", 1.0)
 
     final_risk = max(risk_score, key=risk_score.get)
 
