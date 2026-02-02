@@ -30,3 +30,8 @@ def get_judgment():
 
 def overwrite_judgment(new_state: dict):
     save_state(new_state)
+
+def merge_judgment(patch: dict):
+    state = load_state()
+    state.update(patch)
+    save_state(state)
