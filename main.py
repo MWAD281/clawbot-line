@@ -112,7 +112,7 @@ async def line_webhook(request: Request):
 
             # Call appropriate bot
             if mode == "investor":
-                ai_text = run_investor_swarm(user_text)
+                ai_text = call_openai(user_text, mode)
             elif mode in ["crypto", "commodity", "watchlist"]:
                 ai_text = run_finance_swarm(user_text)
             else:
