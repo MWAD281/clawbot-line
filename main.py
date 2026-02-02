@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request, HTTPException
 from agents.investor_agents import run_investor_swarm
 from agents.finance_agents import run_finance_swarm
 from memory.judgment_state import get_judgment, update_judgment
+from evolution.judgment_evolver import evolve_from_ai
 
 app = FastAPI()
 
@@ -115,7 +116,10 @@ async def line_webhook(request: Request):
             else:
                 ai_text = call_openai(user_text, mode)
 
-            # Reply back to LINE
+            # 🧬 EVOLVE worldview
+            evolve_from_ai(ai_text)
+
+            # reply to user
             reply_line(reply_token, ai_text)
 
     return {"ok": True}
