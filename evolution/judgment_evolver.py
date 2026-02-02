@@ -5,20 +5,23 @@ from memory.judgment_state import update_judgment
 # 🧬 เก็บแรงกระแทกของโลก
 EVOLUTION_BUFFER = {
     "risk_hits": 0,
-    "crisis_hits": 0
+    "crisis_hits": 0,
+    "stability_hits": 0   # 🆕
 }
 
 def evolve_from_ai(ai_text: str):
     text = ai_text.lower()
 
     if any(k in text for k in [
-        "systemic risk",
-        "liquidity shock",
-        "credit stress",
-        "collapse",
-        "crisis"
+        "soft landing",
+        "inflation easing",
+        "liquidity improving",
+        "policy support",
+        "risk stabilizing",
+        "no systemic risk"
     ]):
-        EVOLUTION_BUFFER["risk_hits"] += 1
+        
+    EVOLUTION_BUFFER["stability_hits"] += 1
 
     # 🔥 threshold (แบบดุดัน = 2)
     if EVOLUTION_BUFFER["risk_hits"] >= 2:
