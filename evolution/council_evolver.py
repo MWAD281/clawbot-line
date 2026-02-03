@@ -33,7 +33,7 @@ def evolve_from_council(ai_raw: dict) -> dict:
 
     overwrite_judgment(judgment)
 
-    # 🔥 Darwinism step
+    # 🔥 Darwinism
     adjust_ceo_fitness(opinions)
 
     return judgment
