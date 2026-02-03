@@ -1,22 +1,16 @@
 # worker.py
-
 import time
-from evolution.strategy_pool import StrategyPool
+import logging
 
-def main():
-    print("🔥 Phase 96 worker started")
+logging.basicConfig(level=logging.INFO)
 
-    pool = StrategyPool(initial_size=5)
+def main_loop():
+    logging.info("ClawBot worker started")
 
-    cycle = 0
     while True:
-        cycle += 1
-        print(f"\n--- Cycle {cycle} ---")
-
-        pool.evaluate()
-        pool.evolve()
-
-        time.sleep(10)  # กัน CPU พัง
+        # placeholder logic
+        logging.info("Worker heartbeat: alive")
+        time.sleep(30)
 
 if __name__ == "__main__":
-    main()
+    main_loop()
