@@ -3,29 +3,29 @@ from pydantic import BaseModel
 from typing import Dict, Optional, List
 import random
 import time
-import copy
 import uuid
+import copy
 
 app = FastAPI(
-    title="ClawBot Phase 91 – Sandbox Execution",
-    version="91.0.0",
-    description="Decision engine + sandbox exchange + trade logging"
+    title="ClawBot Phase 94 – Testnet Ready Core",
+    version="94.0.0",
+    description="Exchange adapter + risk control + survival ranking"
 )
 
 # =========================
 # GLOBAL CONFIG
 # =========================
 
-PHASE = 91
-GENERATION = 91
-
+PHASE = 94
 MAX_AGENTS = 5
-MIN_FITNESS = 0.55
-MUTATION_RATE = 0.12
 
 INITIAL_CAPITAL = 100_000.0
+MAX_RISK_PER_TRADE = 0.02      # 2% ต่อไม้
+STOP_LOSS_PCT = 0.03           # 3% SL
+TAKE_PROFIT_PCT = 0.06         # 6% TP
+MIN_FITNESS = 0.55
+MUTATION_RATE = 0.10
 GLOBAL_MAX_DRAWDOWN = -0.30
-MAX_RISK_PER_TRADE = 0.15
 
 AGENTS: Dict[int, Dict] = {}
 TRADE_LOG: List[Dict] = []
@@ -35,23 +35,22 @@ TRADE_LOG: List[Dict] = []
 # =========================
 
 class MarketInput(BaseModel):
-    price: Optional[float] = 100.0
-    volatility: Optional[str] = "normal"
-    regime: Optional[str] = "neutral"
+    price: float = 100.0
+    exchange: str = "sandbox"   # sandbox | binance_testnet | bybit_testnet
 
 
 class TradeResult(BaseModel):
     trade_id: str
     agent_id: int
     decision: str
-    executed_price: float
     size: float
+    entry_price: float
+    exit_price: float
     pnl: float
     capital_after: float
     fitness: float
     note: str
     timestamp: float
-
 
 # =========================
 # AGENT CORE
@@ -71,7 +70,9 @@ def spawn_agent(agent_id: int):
         "fitness": round(random.uniform(0.6, 0.8), 3),
         "capital": INITIAL_CAPITAL / MAX_AGENTS,
         "alive": True,
-        "history": []
+        "wins": 0,
+        "losses": 0,
+        "trades": 0
     }
 
 
@@ -99,8 +100,8 @@ CEO_COUNCIL = {
 # =========================
 
 def global_drawdown():
-    current = sum(a["capital"] for a in AGENTS.values())
-    return (current - INITIAL_CAPITAL) / INITIAL_CAPITAL
+    total = sum(a["capital"] for a in AGENTS.values())
+    return (total - INITIAL_CAPITAL) / INITIAL_CAPITAL
 
 
 def agent_decide(genome):
@@ -112,14 +113,15 @@ def agent_decide(genome):
     return "HOLD"
 
 
+def position_size(capital):
+    return round(capital * MAX_RISK_PER_TRADE, 2)
+
+
 def update_fitness(agent, pnl):
     agent["fitness"] = round(
-        max(0.0, min(1.0, agent["fitness"] + pnl)),
+        max(0.0, min(1.0, agent["fitness"] + pnl / max(agent["capital"], 1))),
         3
     )
-    agent["history"].append(agent["fitness"])
-    if len(agent["history"]) > 30:
-        agent["history"].pop(0)
 
 
 def maybe_mutate(genome):
@@ -132,21 +134,30 @@ def maybe_mutate(genome):
     return None
 
 # =========================
-# SANDBOX EXCHANGE
+# EXCHANGE ADAPTER (Phase 92)
 # =========================
 
-def sandbox_execute(decision, price, capital):
+def execute_trade(exchange, decision, price, size):
+    """
+    Sandbox now
+    Binance / Bybit testnet -> plug API here
+    """
     if decision == "HOLD":
-        return price, 0.0, 0.0
+        return price, price, 0.0
 
-    size = capital * MAX_RISK_PER_TRADE
-    slippage = random.uniform(-0.002, 0.002)
-    executed_price = round(price * (1 + slippage), 4)
+    entry = price * (1 + random.uniform(-0.001, 0.001))
 
-    move = random.uniform(-0.04, 0.05)
-    pnl = size * move
+    move = random.uniform(-0.07, 0.08)
+    raw_exit = entry * (1 + move)
 
-    return executed_price, size, round(pnl, 2)
+    # Stop loss / Take profit
+    sl = entry * (1 - STOP_LOSS_PCT)
+    tp = entry * (1 + TAKE_PROFIT_PCT)
+
+    exit_price = min(max(raw_exit, sl), tp)
+    pnl = (exit_price - entry) / entry * size
+
+    return round(entry, 4), round(exit_price, 4), round(pnl, 2)
 
 # =========================
 # ROOT / HEALTH
@@ -157,7 +168,7 @@ def root():
     return {
         "status": "ClawBot online",
         "phase": PHASE,
-        "agents": len(AGENTS),
+        "agents_alive": sum(1 for a in AGENTS.values() if a["alive"]),
         "drawdown": round(global_drawdown(), 3),
         "trades": len(TRADE_LOG)
     }
@@ -179,8 +190,9 @@ def simulate_market(input: MarketInput):
             trade_id="HALT",
             agent_id=-1,
             decision="HALT",
-            executed_price=0,
             size=0,
+            entry_price=0,
+            exit_price=0,
             pnl=0,
             capital_after=sum(a["capital"] for a in AGENTS.values()),
             fitness=0,
@@ -194,17 +206,25 @@ def simulate_market(input: MarketInput):
 
     genome = agent["genome"]
     decision = agent_decide(genome)
-    confidence = round(random.uniform(0.5, 0.95), 2)
+    confidence = random.uniform(0.5, 0.95)
 
     votes = {k: f(decision, confidence) for k, f in CEO_COUNCIL.items()}
     final_decision = max(set(votes.values()), key=lambda d: list(votes.values()).count(d))
 
-    exec_price, size, pnl = sandbox_execute(
-        final_decision, input.price, agent["capital"]
+    size = position_size(agent["capital"])
+    entry, exit_p, pnl = execute_trade(
+        input.exchange, final_decision, input.price, size
     )
 
     agent["capital"] += pnl
-    update_fitness(agent, pnl / max(agent["capital"], 1))
+    agent["trades"] += 1
+
+    if pnl > 0:
+        agent["wins"] += 1
+    else:
+        agent["losses"] += 1
+
+    update_fitness(agent, pnl)
 
     note = "ok"
     if agent["fitness"] < MIN_FITNESS:
@@ -220,8 +240,8 @@ def simulate_market(input: MarketInput):
         "id": str(uuid.uuid4()),
         "agent": agent_id,
         "decision": final_decision,
-        "price": exec_price,
-        "size": size,
+        "entry": entry,
+        "exit": exit_p,
         "pnl": pnl,
         "capital": agent["capital"],
         "time": time.time()
@@ -232,8 +252,9 @@ def simulate_market(input: MarketInput):
         trade_id=trade["id"],
         agent_id=agent_id,
         decision=final_decision,
-        executed_price=exec_price,
         size=size,
+        entry_price=entry,
+        exit_price=exit_p,
         pnl=pnl,
         capital_after=round(agent["capital"], 2),
         fitness=agent["fitness"],
@@ -242,8 +263,35 @@ def simulate_market(input: MarketInput):
     )
 
 # =========================
-# DEBUG
+# PHASE 94 – SURVIVAL RANKING
 # =========================
+
+@app.get("/ranking")
+def ranking():
+    ranked = sorted(
+        AGENTS.items(),
+        key=lambda x: (
+            x[1]["fitness"],
+            x[1]["capital"],
+            x[1]["wins"] - x[1]["losses"]
+        ),
+        reverse=True
+    )
+    return {
+        "phase": PHASE,
+        "ranking": [
+            {
+                "agent": i,
+                "fitness": a["fitness"],
+                "capital": round(a["capital"], 2),
+                "wins": a["wins"],
+                "losses": a["losses"],
+                "trades": a["trades"]
+            }
+            for i, a in ranked
+        ]
+    }
+
 
 @app.get("/agents")
 def agents():
