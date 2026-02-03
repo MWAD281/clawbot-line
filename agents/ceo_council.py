@@ -2,6 +2,8 @@
 
 from agents.ceo_genome import spawn_ceo, should_die
 from agents.ceo_debate import ceo_debate
+from agents.ceo_feedback import score_ceo_against_market
+from world.market_probe import probe_market_regime
 import uuid
 
 CEO_PROFILES = {
@@ -27,23 +29,24 @@ CEO_PROFILES = {
 
 
 def run_ceo_council(ai_text: str):
-    """
-    CEO Debate → Vote
-    """
+    market = probe_market_regime()
     results = []
 
     for name, profile in CEO_PROFILES.items():
         if not profile["alive"]:
             continue
 
-        result = ceo_debate(ai_text, name, profile)
+        opinion = ceo_debate(ai_text, name, profile)
+        market_score = score_ceo_against_market(opinion, market)
 
-        # memory
-        profile["memory"].append(result)
-        if len(profile["memory"]) > 50:
-            profile["memory"] = profile["memory"][-50:]
+        opinion["market_score"] = market_score
+        opinion["regime"] = market["regime"]
 
-        results.append(result)
+        profile["memory"].append(opinion)
+        if len(profile["memory"]) > 100:
+            profile["memory"] = profile["memory"][-100:]
+
+        results.append(opinion)
 
     return results
 
@@ -56,8 +59,8 @@ def adjust_ceo_fitness(results: list):
         if not ceo:
             continue
 
-        ceo["weight"] += r["score"] * 0.1
-        ceo["weight"] = max(0.05, min(2.0, ceo["weight"]))
+        ceo["weight"] += r["market_score"] * 0.15
+        ceo["weight"] = max(0.05, min(3.0, ceo["weight"]))
 
         if should_die(ceo):
             ceo["alive"] = False
