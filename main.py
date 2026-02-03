@@ -1,15 +1,15 @@
-import os
-from typing import Optional, Dict, List
-
+from typing import Dict, List
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import random
+import uuid
 
 
 # ==================================================
 # APP
 # ==================================================
 
-app = FastAPI(title="ClawBot Core")
+app = FastAPI(title="ClawBot Darwinism Core")
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,112 +21,153 @@ app.add_middleware(
 
 
 # ==================================================
-# GLOBAL MEMORY (simple & stable)
+# GLOBAL JUDGMENT MEMORY
 # ==================================================
 
 JUDGMENT_STATE = {
     "global_risk": "MEDIUM",
     "worldview": "defensive",
     "stance": "NEUTRAL",
-    "confidence": 0.2,
-    "inertia": 1.0,
-    "source": "BOOT",
+    "confidence": 0.3,
+    "inertia": 1.2,
+    "generation": 1,
     "history": []
 }
 
 
-def get_judgment():
-    return JUDGMENT_STATE
+# ==================================================
+# DARWIN COUNCIL
+# ==================================================
+
+def new_agent(name: str) -> Dict:
+    return {
+        "id": str(uuid.uuid4())[:8],
+        "name": name,
+        "hp": 100,
+        "fitness": 1.0,
+        "alive": True
+    }
 
 
-def overwrite_judgment(new_state: Dict):
-    JUDGMENT_STATE.update(new_state)
+COUNCIL: List[Dict] = [
+    new_agent("HAWK"),
+    new_agent("DOVE"),
+    new_agent("CHAOS"),
+    new_agent("HISTORIAN"),
+    new_agent("SURVIVOR")
+]
 
 
 # ==================================================
-# COUNCIL (5 AGENTS)
+# AGENT BEHAVIOR
 # ==================================================
 
-def council_vote(market: Dict) -> Dict:
-    votes: List[str] = []
+def agent_vote(agent: Dict, market: Dict) -> str | None:
+    if not agent["alive"]:
+        return None
 
-    # 1. Hawk – risk first
-    if market["risk_level"] == "high":
-        votes.append("RISK_UP")
+    name = agent["name"]
 
-    # 2. Dove – stabilization bias
-    if market["trend"] == "down" and market["volatility"] != "extreme":
-        votes.append("STABLE")
+    if name == "HAWK" and market["risk_level"] == "high":
+        return "RISK_UP"
 
-    # 3. Chaos – tail risk detector
-    if market["volatility"] == "extreme":
-        votes.append("CHAOS")
+    if name == "DOVE" and market["trend"] == "down":
+        return "STABLE"
 
-    # 4. Historian – crisis pattern
-    if market["risk_level"] == "high" and market["trend"] == "down":
-        votes.append("CRISIS_PATTERN")
+    if name == "CHAOS" and market["volatility"] == "extreme":
+        return "CHAOS"
 
-    # 5. Survivor – liquidity stress
-    if market["liquidity"] == "tight":
-        votes.append("DEFENSIVE")
+    if name == "HISTORIAN" and market["risk_level"] == "high":
+        return "CRISIS_PATTERN"
+
+    if name == "SURVIVOR" and market["liquidity"] == "tight":
+        return "DEFENSIVE"
+
+    return None
+
+
+def council_deliberate(market: Dict) -> Dict:
+    votes = []
+    contributors = []
+
+    for agent in COUNCIL:
+        vote = agent_vote(agent, market)
+        if vote:
+            weighted = agent["fitness"]
+            votes.append((vote, weighted))
+            contributors.append(agent)
 
     return {
         "votes": votes,
-        "count": len(votes)
+        "contributors": contributors
     }
 
 
-def apply_council(judgment: Dict, council: Dict) -> Dict:
-    new_state = judgment.copy()
-
-    # inertia: ไม่เปลี่ยนแรงเกิน
-    inertia = judgment.get("inertia", 1.0)
-
-    if "CHAOS" in council["votes"]:
-        new_state["worldview"] = "fragile"
-        new_state["confidence"] = min(1.0, judgment["confidence"] + 0.2 / inertia)
-
-    if council["count"] >= 3:
-        new_state["global_risk"] = "HIGH"
-        new_state["stance"] = "DEFENSIVE"
-
-    new_state["source"] = "COUNCIL"
-    return new_state
-
-
 # ==================================================
-# MARKET FEEDBACK LOOP (simple deterministic)
+# FEEDBACK & FITNESS
 # ==================================================
 
-def run_market_feedback_loop(market: Dict) -> Dict:
+def evaluate_market(market: Dict) -> Dict:
     score = 0.0
-    tags = []
 
     if market["risk_level"] == "high":
         score -= 0.3
-        tags.append("RISK_HIGH")
-
     if market["trend"] == "down":
         score -= 0.3
-        tags.append("TREND_DOWN")
-
     if market["volatility"] == "extreme":
         score -= 0.2
-        tags.append("VOLATILITY_EXTREME")
-
     if market["liquidity"] == "tight":
         score -= 0.2
-        tags.append("LIQUIDITY_TIGHT")
 
     return {
-        "status": "FEEDBACK_APPLIED",
-        "outcome": {
-            "score": round(score, 2),
-            "global_risk": abs(round(score, 2)),
-            "confidence": min(1.0, abs(score)),
-            "tags": tags
-        }
+        "score": round(score, 2),
+        "severity": abs(score)
     }
+
+
+def apply_darwinism(result: Dict, contributors: List[Dict]):
+    severity = result["severity"]
+
+    for agent in contributors:
+        if severity > 0.6:
+            agent["hp"] -= int(severity * 40)
+            agent["fitness"] *= 0.9
+        else:
+            agent["fitness"] *= 1.05
+
+        if agent["hp"] <= 0:
+            agent["alive"] = False
+
+
+def rebirth():
+    global COUNCIL
+
+    dead = [a for a in COUNCIL if not a["alive"]]
+    for agent in dead:
+        COUNCIL.remove(agent)
+        mutant = new_agent(agent["name"] + "_v2")
+        mutant["fitness"] = round(random.uniform(0.8, 1.2), 2)
+        COUNCIL.append(mutant)
+
+
+# ==================================================
+# JUDGMENT UPDATE
+# ==================================================
+
+def update_judgment(votes: List, result: Dict):
+    global JUDGMENT_STATE
+
+    if result["severity"] > 0.7:
+        JUDGMENT_STATE["global_risk"] = "HIGH"
+        JUDGMENT_STATE["stance"] = "DEFENSIVE"
+        JUDGMENT_STATE["worldview"] = "fragile"
+
+    JUDGMENT_STATE["confidence"] = min(
+        1.0,
+        JUDGMENT_STATE["confidence"] + (0.1 if result["severity"] < 0.6 else -0.1)
+    )
+
+    JUDGMENT_STATE["generation"] += 1
 
 
 # ==================================================
@@ -135,50 +176,51 @@ def run_market_feedback_loop(market: Dict) -> Dict:
 
 @app.get("/")
 def health():
-    return {"status": "ClawBot alive"}
+    return {"status": "ClawBot Darwinism Alive"}
+
+
+@app.get("/council")
+def council_state():
+    return COUNCIL
 
 
 @app.get("/world")
-def world_state():
-    return get_judgment()
+def world():
+    return JUDGMENT_STATE
 
 
 @app.post("/simulate/market")
 def simulate_market(
-    risk_level: Optional[str] = "high",
-    trend: Optional[str] = "down",
-    volatility: Optional[str] = "extreme",
-    liquidity: Optional[str] = "tight"
+    risk_level: str = "high",
+    trend: str = "down",
+    volatility: str = "extreme",
+    liquidity: str = "tight"
 ):
-    market_state = {
+    market = {
         "risk_level": risk_level,
         "trend": trend,
         "volatility": volatility,
         "liquidity": liquidity
     }
 
-    # council deliberation
-    council = council_vote(market_state)
+    council_result = council_deliberate(market)
+    evaluation = evaluate_market(market)
 
-    # feedback
-    feedback = run_market_feedback_loop(market_state)
+    apply_darwinism(evaluation, council_result["contributors"])
+    rebirth()
+    update_judgment(council_result["votes"], evaluation)
 
-    # update judgment
-    current = get_judgment()
-    updated = apply_council(current, council)
-
-    updated["history"].append({
-        "source": "MARKET_FEEDBACK",
-        "market_state": market_state,
-        "outcome": feedback["outcome"]
+    JUDGMENT_STATE["history"].append({
+        "market": market,
+        "evaluation": evaluation,
+        "votes": council_result["votes"]
     })
-
-    overwrite_judgment(updated)
 
     return {
         "status": "SIMULATION_COMPLETE",
-        "market_state": market_state,
-        "council": council,
-        "result": feedback,
-        "judgment": updated
+        "market": market,
+        "evaluation": evaluation,
+        "council_votes": council_result["votes"],
+        "council_state": COUNCIL,
+        "judgment": JUDGMENT_STATE
     }
