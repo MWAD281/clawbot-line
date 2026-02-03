@@ -1,8 +1,12 @@
 import time
 
-print("=== CLAWBOT WORKER BOOT ===")
+print("BOOT OK")
+
+import os
+import sys
+
+print("CORE IMPORT OK")
 
 while True:
-    print("Worker heartbeat - still alive")
+    print("Worker alive")
     time.sleep(30)
-
