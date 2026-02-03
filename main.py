@@ -8,7 +8,7 @@ import copy
 import statistics
 
 app = FastAPI(
-    title="ClawBot Phase 46 – Agent Specialization",
+    title="ClawBot Phase 47 – Meta Allocator",
     version="1.0.0"
 )
 
@@ -102,14 +102,29 @@ for _ in range(POPULATION_SIZE):
     spawn_agent()
 
 # =========================
-# Market
+# Market Regime
 # =========================
 def detect_regime(m: MarketInput):
-    if m.momentum > 0.5:
+    if m.momentum > 0.6:
         return "BULL"
-    if m.momentum < -0.5:
+    if m.momentum < -0.6:
         return "BEAR"
     return "SIDEWAYS"
+
+# =========================
+# Meta Allocator (NEW)
+# =========================
+def regime_weights(regime: str, volatility: str):
+    if regime == "BULL":
+        return {"TREND": 0.45, "MEAN": 0.15, "SCALP": 0.25, "CRISIS": 0.15}
+    if regime == "BEAR":
+        return {"TREND": 0.15, "MEAN": 0.20, "SCALP": 0.20, "CRISIS": 0.45}
+    # SIDEWAYS
+    base = {"TREND": 0.15, "MEAN": 0.45, "SCALP": 0.30, "CRISIS": 0.10}
+    if volatility == "high":
+        base["SCALP"] += 0.1
+        base["MEAN"] -= 0.1
+    return base
 
 # =========================
 # Memory Engine
@@ -131,34 +146,22 @@ def memory_bias(agent, snapshot):
     return sum(weighted) / len(weighted)
 
 # =========================
-# Decision Engine (By Role)
+# Decision Engine
 # =========================
 def decide(agent, market, regime):
     role = agent["role"]
     mem = memory_bias(agent, {"regime": regime, "momentum": market.momentum})
-    adapt = agent["gene"]["adaptability"]
 
-    if role == "TREND":
-        if abs(market.momentum) > 0.4:
-            return "ENTER"
-        return "HOLD"
+    if role == "TREND" and abs(market.momentum) > 0.4:
+        return "ENTER"
+    if role == "MEAN" and regime == "SIDEWAYS":
+        return "ENTER"
+    if role == "SCALP" and market.volatility == "high":
+        return "SCALP"
+    if role == "CRISIS" and market.momentum < -0.7:
+        return "ENTER"
 
-    if role == "MEAN":
-        if regime == "SIDEWAYS" and abs(market.momentum) < 0.3:
-            return "ENTER"
-        return "HOLD"
-
-    if role == "SCALP":
-        if market.volatility == "high":
-            return "SCALP"
-        return "HOLD"
-
-    if role == "CRISIS":
-        if market.momentum < -0.7:
-            return "ENTER"
-        return "HOLD"
-
-    if mem > 0.02 and adapt > 0.4:
+    if mem > 0.02:
         return "ENTER"
 
     return "HOLD"
@@ -169,19 +172,10 @@ def decide(agent, market, regime):
 def slippage(market):
     return SLIPPAGE_BASE * {"loose": 0.8, "normal": 1.0, "tight": 1.6}[market.liquidity]
 
-def position_size(agent, regime):
-    base = agent["gene"]["base_position"]
-    risk = agent["gene"]["risk_tolerance"]
-
-    role_mult = {
-        "TREND": 1.2,
-        "MEAN": 0.8,
-        "SCALP": 0.5,
-        "CRISIS": 1.5
-    }[agent["role"]]
-
-    adj = 1.0 if regime != "SIDEWAYS" else 0.6
-    return max(0.01, min(0.7, base * risk * role_mult * adj))
+def position_size(agent):
+    return max(0.01, min(0.6,
+        agent["gene"]["base_position"] * agent["gene"]["risk_tolerance"]
+    ))
 
 def open_position(agent, side, price, size, market):
     fill = price * (1 + slippage(market) if side == "LONG" else 1 - slippage(market))
@@ -224,26 +218,36 @@ def risk(agent):
         agent["position"]["size"] *= 0.5
 
 # =========================
-# Capital Allocator (By Role)
+# Capital Allocation (Meta)
 # =========================
 def score_agent(agent):
     if len(agent["returns"]) < 3:
-        return 0
+        return 0.1
     avg = statistics.mean(agent["returns"])
     vol = statistics.stdev(agent["returns"]) if len(agent["returns"]) > 1 else 0.01
-    return avg / max(0.01, vol)
+    return max(0.05, avg / max(0.01, vol))
 
-def allocate_capital():
+def allocate_capital(regime, volatility):
     alive = [a for a in AGENTS.values() if a["alive"]]
     if not alive:
         return
 
-    scores = {a["id"]: max(0, score_agent(a)) for a in alive}
-    total = sum(scores.values()) or 1
+    weights = regime_weights(regime, volatility)
+    role_groups: Dict[str, List[dict]] = {}
 
     for a in alive:
-        target = TOTAL_CAPITAL * (scores[a["id"]] / total)
-        a["capital"] = max(20_000, target)
+        role_groups.setdefault(a["role"], []).append(a)
+
+    for role, agents in role_groups.items():
+        pool = TOTAL_CAPITAL * weights.get(role, 0.1)
+        scores = {a["id"]: score_agent(a) for a in agents}
+        total = sum(scores.values()) or 1
+
+        for a in agents:
+            a["capital"] = max(
+                20_000,
+                pool * (scores[a["id"]] / total)
+            )
 
 # =========================
 # Evolution
@@ -285,7 +289,7 @@ def evolve():
 @app.get("/")
 def root():
     return {
-        "status": "ClawBot Phase 46 ONLINE",
+        "status": "ClawBot Phase 47 ONLINE",
         "generation": GENERATION,
         "agents": len(AGENTS)
     }
@@ -305,15 +309,15 @@ def simulate(market: MarketInput):
 
         if decision in ["ENTER", "SCALP"]:
             side = "LONG" if regime == "BULL" else "SHORT"
-            open_position(agent, side, market.price, position_size(agent, regime), market)
+            open_position(agent, side, market.price, position_size(agent), market)
 
         risk(agent)
 
-    allocate_capital()
+    allocate_capital(regime, market.volatility)
     evolve()
 
     return {
-        "phase": 46,
+        "phase": 47,
         "generation": GENERATION,
         "regime": regime,
         "agents_alive": len([a for a in AGENTS.values() if a["alive"]])
@@ -322,11 +326,11 @@ def simulate(market: MarketInput):
 @app.get("/dashboard")
 def dashboard():
     return {
-        "phase": 46,
+        "phase": 47,
         "generation": GENERATION,
         "agents": list(AGENTS.values()),
         "hall_of_fame": HALL_OF_FAME,
-        "allocator": "ROLE_BASED"
+        "allocator": "META_REGIME"
     }
 
 @app.post("/line/webhook")
