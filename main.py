@@ -12,7 +12,7 @@ import time
 # APP
 # ==================================================
 
-app = FastAPI(title="ClawBot Phase 18 – Live Darwinism")
+app = FastAPI(title="ClawBot Phase 18 – Live Dashboard")
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,20 +33,30 @@ def now():
     return int(time.time())
 
 # ==================================================
-# MARKET
+# MARKET MODEL (JSON BODY)
+# ==================================================
+
+class MarketInput(BaseModel):
+    risk_level: str = "high"
+    trend: str = "down"
+    volatility: str = "extreme"
+    liquidity: str = "tight"
+
+# ==================================================
+# MARKET LOGIC
 # ==================================================
 
 def market_return(m):
     r = 0.0
     if m["trend"] == "up":
-        r += 0.02
+        r += random.uniform(0.01, 0.03)
     if m["trend"] == "down":
-        r -= 0.02
+        r -= random.uniform(0.01, 0.03)
     if m["risk_level"] == "high":
-        r -= 0.01
+        r -= random.uniform(0.005, 0.015)
     if m["volatility"] == "extreme":
-        r += random.uniform(-0.03, 0.03)
-    return r
+        r += random.uniform(-0.05, 0.05)
+    return round(r, 4)
 
 # ==================================================
 # AGENTS
@@ -62,7 +72,7 @@ def agent_signal(agent, market, stance):
         return "BUY"
     if stance == "VOLATILITY" and market["volatility"] == "extreme":
         return random.choice(["BUY", "SELL"])
-    return "HOLD"
+    return random.choice(["HOLD", "BUY", "SELL"])
 
 # ==================================================
 # WORLD
@@ -78,20 +88,18 @@ def new_world(seed=100_000):
         "equity": seed,
         "peak": seed,
         "stance": random.choice(["DEFENSIVE", "AGGRESSIVE", "VOLATILITY"]),
-        "risk_budget": round(random.uniform(0.1, 0.25), 2),
+        "risk_budget": round(random.uniform(0.15, 0.35), 2),
         "max_dd": round(random.uniform(0.25, 0.45), 2),
-        "council": [
-            new_agent("CORE"),
-            new_agent("RISK"),
-            new_agent("EXEC")
-        ],
+        "council": [new_agent("CORE"), new_agent("RISK"), new_agent("EXEC")],
         "history": [],
+        "last_return": 0.0,
         "is_champion": False
     }
 
 WORLDS: List[Dict] = [new_world() for _ in range(3)]
 CHAMPION_HISTORY: List[Dict] = []
 CHAMPION_ID = None
+STEP = 0
 
 # ==================================================
 # TRADING
@@ -111,8 +119,9 @@ def trade(world, signal, market):
         world["cash"] += size
 
     world["position"] *= (1 + r)
-    world["equity"] = world["cash"] + world["position"]
+    world["equity"] = round(world["cash"] + world["position"], 2)
     world["peak"] = max(world["peak"], world["equity"])
+    world["last_return"] = r
 
 def check_death(world):
     dd = 1 - (world["equity"] / world["peak"])
@@ -125,61 +134,45 @@ def check_death(world):
 
 def select_champion():
     global CHAMPION_ID
-
     alive = [w for w in WORLDS if w["alive"]]
     if not alive:
         CHAMPION_ID = None
         return
 
     best = max(alive, key=lambda w: w["equity"])
-
     if CHAMPION_ID != best["id"]:
         CHAMPION_HISTORY.append({
             "time": now(),
             "champion": best["id"],
-            "equity": round(best["equity"], 2)
+            "equity": best["equity"]
         })
 
     CHAMPION_ID = best["id"]
-
     for w in WORLDS:
         w["is_champion"] = (w["id"] == CHAMPION_ID)
 
 def reproduce():
     global WORLDS
-
     alive = [w for w in WORLDS if w["alive"]]
 
     if not alive:
-        WORLDS = [new_world() for _ in range(3)]
+        WORLDS = [new_world()]
         return
 
     alive.sort(key=lambda w: w["equity"], reverse=True)
 
-    children = alive.copy()
-    while len(children) < 3:
-        parent = copy.deepcopy(alive[0])
-        parent["id"] = uid()
-        parent["generation"] += 1
-        parent["cash"] = parent["equity"]
-        parent["position"] = 0
-        parent["peak"] = parent["cash"]
-        parent["history"] = []
-        parent["alive"] = True
-        parent["is_champion"] = False
-        children.append(parent)
+    while len(alive) < 3:
+        p = copy.deepcopy(alive[0])
+        p["id"] = uid()
+        p["generation"] += 1
+        p["cash"] = p["equity"]
+        p["position"] = 0
+        p["peak"] = p["cash"]
+        p["history"] = []
+        p["is_champion"] = False
+        alive.append(p)
 
-    WORLDS = children
-
-# ==================================================
-# API MODELS
-# ==================================================
-
-class MarketInput(BaseModel):
-    risk_level: str = "high"
-    trend: str = "down"
-    volatility: str = "extreme"
-    liquidity: str = "tight"
+    WORLDS = alive
 
 # ==================================================
 # API
@@ -189,13 +182,12 @@ class MarketInput(BaseModel):
 def root():
     return {"status": "ClawBot Phase 18 – Running"}
 
-@app.get("/health")
-def health():
-    return {"ok": True}
-
 @app.post("/simulate/market")
 def simulate_market(market: MarketInput):
-    market = market.dict()
+    global STEP
+    STEP += 1
+
+    m = market.dict()
 
     select_champion()
 
@@ -203,33 +195,21 @@ def simulate_market(market: MarketInput):
         if not w["alive"]:
             continue
 
-        signals = [
-            agent_signal(a, market, w["stance"])
-            for a in w["council"]
-        ]
+        signals = [agent_signal(a, m, w["stance"]) for a in w["council"]]
         final_signal = max(set(signals), key=signals.count)
 
-        trade(w, final_signal, market)
+        trade(w, final_signal, m)
         check_death(w)
-        w["history"].append(round(w["equity"], 2))
+        w["history"].append(w["equity"])
 
     reproduce()
     select_champion()
 
     return {
-        "status": "SIMULATION_COMPLETE",
-        "market": market,
+        "step": STEP,
+        "market": m,
         "champion": CHAMPION_ID,
-        "worlds": [
-            {
-                "id": w["id"],
-                "equity": round(w["equity"], 2),
-                "stance": w["stance"],
-                "alive": w["alive"],
-                "gen": w["generation"],
-                "is_champion": w["is_champion"]
-            } for w in WORLDS
-        ]
+        "worlds": WORLDS
     }
 
 # ==================================================
@@ -245,17 +225,13 @@ def dashboard():
             <td>{w['id']}</td>
             <td>{w['stance']}</td>
             <td>{w['generation']}</td>
-            <td>{round(w['equity'],2)}</td>
+            <td>{w['equity']}</td>
+            <td>{w['last_return']}</td>
             <td>{"🏆" if w['is_champion'] else ""}</td>
         </tr>
         """
 
-    champ_hist = "".join(
-        f"<li>{h['time']} → {h['champion']} ({h['equity']})</li>"
-        for h in CHAMPION_HISTORY[-10:]
-    )
-
-    return f"""
+    html = f"""
     <html>
     <head>
         <title>ClawBot Dashboard</title>
@@ -271,14 +247,12 @@ def dashboard():
         <h1>🧠 ClawBot Live Dashboard</h1>
         <table>
             <tr>
-                <th>ID</th><th>Stance</th><th>Gen</th><th>Equity</th><th>Champion</th>
+                <th>ID</th><th>Stance</th><th>Gen</th><th>Equity</th><th>Last R</th><th>🏆</th>
             </tr>
             {rows}
         </table>
-
-        <h2>🏆 Champion Timeline</h2>
-        <ul>{champ_hist}</ul>
         <p>Auto refresh every 5s</p>
     </body>
     </html>
     """
+    return html
