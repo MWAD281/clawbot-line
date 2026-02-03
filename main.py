@@ -9,7 +9,7 @@ import copy
 # APP
 # ==================================================
 
-app = FastAPI(title="ClawBot Phase 15 – Champion Brain World")
+app = FastAPI(title="ClawBot Phase 16 – Paper Trading Engine")
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,70 +27,71 @@ def uid():
     return str(uuid.uuid4())[:8]
 
 # ==================================================
+# MARKET MODELS
+# ==================================================
+
+VOL_MULTIPLIER = {
+    "low": 0.2,
+    "normal": 0.5,
+    "extreme": 1.0
+}
+
+FEE_RATE = 0.001      # 0.1%
+BASE_SLIPPAGE = 0.002 # 0.2%
+
+def calc_slippage(volatility: str):
+    return BASE_SLIPPAGE * VOL_MULTIPLIER.get(volatility, 0.5)
+
+# ==================================================
 # AGENT
 # ==================================================
 
 def new_agent(name: str) -> Dict:
     return {"id": uid(), "name": name, "alive": True}
 
-def agent_vote(agent: Dict, market: Dict, stance: str):
+def agent_signal(agent: Dict, market: Dict, stance: str):
     if not agent["alive"]:
         return None
 
     if stance == "DEFENSIVE" and market["risk_level"] == "high":
-        return "CASH"
+        return "SELL"
     if stance == "AGGRESSIVE" and market["trend"] == "up":
-        return "RISK_ON"
+        return "BUY"
     if stance == "VOLATILITY" and market["volatility"] == "extreme":
-        return "VOL_PLAY"
-    return None
+        return "TRADE_VOL"
+    return "HOLD"
 
 # ==================================================
-# CRISIS MEMORY
-# ==================================================
-
-CRISIS_LIBRARY = {
-    "2008": {
-        "pattern": {"liquidity": "tight", "trend": "down"},
-        "best_stance": "DEFENSIVE"
-    },
-    "2020": {
-        "pattern": {"volatility": "extreme"},
-        "best_stance": "VOLATILITY"
-    },
-    "2022": {
-        "pattern": {"risk_level": "high", "trend": "down"},
-        "best_stance": "DEFENSIVE"
-    }
-}
-
-def detect_crisis(market: Dict):
-    hits = []
-    for name, crisis in CRISIS_LIBRARY.items():
-        if all(market.get(k) == v for k, v in crisis["pattern"].items()):
-            hits.append(name)
-    return hits
-
-# ==================================================
-# WORLD
+# WORLD / PORTFOLIO
 # ==================================================
 
 def new_world(seed_capital=100_000):
     return {
         "id": uid(),
         "generation": 1,
-        "capital": seed_capital,
-        "peak": seed_capital,
         "alive": True,
-        "risk_budget": round(random.uniform(0.08, 0.25), 2),
-        "max_drawdown": round(random.uniform(0.2, 0.4), 2),
+
+        # portfolio
+        "cash": seed_capital,
+        "position": 0.0,
+        "equity": seed_capital,
+        "peak_equity": seed_capital,
+
+        # risk
+        "risk_budget": round(random.uniform(0.1, 0.25), 2),
+        "max_drawdown": round(random.uniform(0.25, 0.45), 2),
+
+        # behavior
         "stance": random.choice(["DEFENSIVE", "AGGRESSIVE", "VOLATILITY"]),
         "memory": {},
+
+        # org
         "council": [
             new_agent("CORE"),
             new_agent("RISK"),
-            new_agent("MEMORY")
+            new_agent("EXEC")
         ],
+
         "history": [],
         "is_champion": False
     }
@@ -99,52 +100,65 @@ WORLDS: List[Dict] = [new_world() for _ in range(3)]
 CHAMPION_ID: str | None = None
 
 # ==================================================
-# MARKET
+# MARKET ENGINE
 # ==================================================
 
-def market_severity(m: Dict) -> float:
-    score = 0
-    score += 0.3 if m["risk_level"] == "high" else 0
-    score += 0.3 if m["trend"] == "down" else 0
-    score += 0.2 if m["volatility"] == "extreme" else 0
-    score += 0.2 if m["liquidity"] == "tight" else 0
-    return round(score, 2)
+def market_return(market: Dict):
+    base = 0
+    if market["trend"] == "up":
+        base += 0.02
+    if market["trend"] == "down":
+        base -= 0.02
+    if market["risk_level"] == "high":
+        base -= 0.01
+    if market["volatility"] == "extreme":
+        base += random.uniform(-0.03, 0.03)
+    return base
 
 # ==================================================
-# RETURN ENGINE
+# TRADING ENGINE
 # ==================================================
 
-def calc_return(votes: List[str], sev: float, risk_budget: float, aligned: bool):
-    r = -sev * risk_budget
-    if "CASH" in votes:
-        r += 0.12
-    if "RISK_ON" in votes and sev < 0.4:
-        r += 0.25
-    if "VOL_PLAY" in votes:
-        r += random.uniform(-0.1, 0.3)
+def execute_trade(world: Dict, signal: str, market: Dict):
+    price_return = market_return(market)
+    slippage = calc_slippage(market["volatility"])
 
-    # alignment bonus / penalty
-    r += 0.05 if aligned else -0.05
-    return round(r, 3)
+    traded = False
+    fee = 0
+
+    if signal == "BUY" and world["cash"] > 0:
+        size = world["cash"] * world["risk_budget"]
+        fee = size * FEE_RATE
+        world["cash"] -= size + fee
+        world["position"] += size * (1 - slippage)
+        traded = True
+
+    elif signal == "SELL" and world["position"] > 0:
+        size = world["position"] * world["risk_budget"]
+        fee = size * FEE_RATE
+        world["position"] -= size
+        world["cash"] += size * (1 - slippage) - fee
+        traded = True
+
+    # mark-to-market
+    world["position"] *= (1 + price_return)
+    world["equity"] = world["cash"] + world["position"]
+    world["peak_equity"] = max(world["peak_equity"], world["equity"])
+
+    return {
+        "signal": signal,
+        "traded": traded,
+        "fee": round(fee, 2),
+        "slippage": round(slippage, 4),
+        "price_return": round(price_return, 4)
+    }
 
 # ==================================================
 # EVOLUTION
 # ==================================================
 
-def adapt_world(world: Dict, ret: float, crises: List[str]):
-    world["risk_budget"] *= 1.05 if ret > 0 else 0.9
-    world["risk_budget"] = min(max(world["risk_budget"], 0.05), 0.4)
-
-    for c in crises:
-        mem = world["memory"].setdefault(c, {"wins": 0, "losses": 0})
-        if ret > 0:
-            mem["wins"] += 1
-            world["stance"] = CRISIS_LIBRARY[c]["best_stance"]
-        else:
-            mem["losses"] += 1
-
 def check_death(world: Dict):
-    dd = 1 - (world["capital"] / world["peak"])
+    dd = 1 - (world["equity"] / world["peak_equity"])
     if dd > world["max_drawdown"]:
         world["alive"] = False
 
@@ -155,7 +169,7 @@ def select_champion():
         CHAMPION_ID = None
         return
 
-    best = max(alive, key=lambda w: w["capital"])
+    best = max(alive, key=lambda w: w["equity"])
     CHAMPION_ID = best["id"]
 
     for w in WORLDS:
@@ -169,14 +183,16 @@ def reproduce():
         WORLDS = [new_world()]
         return
 
-    survivors.sort(key=lambda w: w["capital"], reverse=True)
+    survivors.sort(key=lambda w: w["equity"], reverse=True)
 
     while len(survivors) < 3:
         parent = copy.deepcopy(survivors[0])
         parent["id"] = uid()
         parent["generation"] += 1
-        parent["capital"] *= random.uniform(0.9, 1.1)
-        parent["peak"] = parent["capital"]
+        parent["cash"] *= random.uniform(0.9, 1.1)
+        parent["position"] = 0
+        parent["equity"] = parent["cash"]
+        parent["peak_equity"] = parent["equity"]
         parent["risk_budget"] *= random.uniform(0.9, 1.1)
         parent["is_champion"] = False
         survivors.append(parent)
@@ -189,7 +205,7 @@ def reproduce():
 
 @app.get("/")
 def root():
-    return {"status": "Phase 15 Online – Champion Brain Active"}
+    return {"status": "Phase 16 Online – Paper Trading Active"}
 
 @app.get("/worlds")
 def worlds():
@@ -209,9 +225,6 @@ def simulate_market(
         "liquidity": liquidity
     }
 
-    sev = market_severity(market)
-    crises = detect_crisis(market)
-
     select_champion()
     champion = next((w for w in WORLDS if w["is_champion"]), None)
 
@@ -221,29 +234,28 @@ def simulate_market(
 
         aligned = champion and (w["stance"] == champion["stance"])
 
-        votes = []
+        signals = []
         for a in w["council"]:
-            v = agent_vote(a, market, w["stance"])
-            if v:
-                votes.append(v)
+            s = agent_signal(a, market, w["stance"])
+            signals.append(s)
 
-        ret = calc_return(votes, sev, w["risk_budget"], aligned)
-        pnl = w["capital"] * ret
+        final_signal = max(set(signals), key=signals.count)
 
-        w["capital"] += pnl
-        w["peak"] = max(w["peak"], w["capital"])
+        trade = execute_trade(w, final_signal, market)
 
-        adapt_world(w, ret, crises)
+        if not aligned:
+            w["equity"] *= 0.995  # misalignment penalty
+
         check_death(w)
 
         w["history"].append({
             "market": market,
-            "crises": crises,
-            "votes": votes,
-            "aligned_with_champion": aligned,
-            "return": ret,
-            "capital": round(w["capital"], 2),
-            "stance": w["stance"],
+            "signals": signals,
+            "final_signal": final_signal,
+            "trade": trade,
+            "equity": round(w["equity"], 2),
+            "cash": round(w["cash"], 2),
+            "position": round(w["position"], 2),
             "is_champion": w["is_champion"]
         })
 
@@ -256,13 +268,14 @@ def simulate_market(
         "worlds": [
             {
                 "id": w["id"],
-                "capital": round(w["capital"], 2),
+                "equity": round(w["equity"], 2),
+                "cash": round(w["cash"], 2),
+                "position": round(w["position"], 2),
                 "stance": w["stance"],
                 "risk_budget": round(w["risk_budget"], 2),
                 "alive": w["alive"],
                 "generation": w["generation"],
-                "is_champion": w["is_champion"],
-                "memory": w["memory"]
+                "is_champion": w["is_champion"]
             } for w in WORLDS
         ]
     }
