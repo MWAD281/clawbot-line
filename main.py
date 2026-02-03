@@ -1,10 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Dict, List
+from typing import Dict
 import random
 import uuid
 
-app = FastAPI(title="ClawBot Phase 23 – MultiWorld Council Darwinism")
+app = FastAPI(title="ClawBot Phase 24 – True Darwinism")
 
 # -------------------------
 # CORS
@@ -20,46 +20,44 @@ app.add_middleware(
 # -------------------------
 # CONFIG
 # -------------------------
-POPULATION_SIZE = 9
-INITIAL_EQUITY = 100_000
-KILL_THRESHOLD = 0.55
-MUTATION_RATE = 0.3
+POPULATION_SIZE = 10
+BASE_CAPITAL = 100_000
+EXTINCTION_THRESHOLD = 0.5
+MUTATION_RATE = 0.35
+MEMORY_DECAY = 0.92
 
-REGIMES = ["up", "down", "sideways"]
 WORLDS = ["crypto", "equity", "macro"]
+REGIMES = ["up", "down", "sideways"]
 
 # -------------------------
 # DNA
 # -------------------------
-def random_gene():
+def gene():
     return {
-        "risk": round(random.uniform(0.01, 0.06), 3),
-        "leverage": round(random.uniform(1.0, 4.0), 2),
-        "aggression": round(random.uniform(0.2, 1.0), 2),
+        "risk": round(random.uniform(0.01, 0.07), 3),
+        "leverage": round(random.uniform(1.0, 5.0), 2),
+        "aggression": round(random.uniform(0.2, 1.2), 2),
     }
 
 def random_dna():
     return {
-        world: {
-            regime: random_gene()
-            for regime in REGIMES
-        }
-        for world in WORLDS
+        w: {r: gene() for r in REGIMES}
+        for w in WORLDS
     }
 
 def mutate_dna(dna):
     new = {}
-    for world, regimes in dna.items():
-        new[world] = {}
-        for regime, gene in regimes.items():
-            g = gene.copy()
+    for w, regimes in dna.items():
+        new[w] = {}
+        for r, g in regimes.items():
+            m = g.copy()
             if random.random() < MUTATION_RATE:
-                g["risk"] = round(max(0.005, min(0.1, g["risk"] + random.uniform(-0.02, 0.02))), 3)
+                m["risk"] = round(max(0.005, min(0.12, m["risk"] + random.uniform(-0.02, 0.02))), 3)
             if random.random() < MUTATION_RATE:
-                g["leverage"] = round(max(1.0, min(6.0, g["leverage"] + random.uniform(-0.8, 0.8))), 2)
+                m["leverage"] = round(max(1.0, min(7.0, m["leverage"] + random.uniform(-1, 1))), 2)
             if random.random() < MUTATION_RATE:
-                g["aggression"] = round(max(0.1, min(1.2, g["aggression"] + random.uniform(-0.2, 0.2))), 2)
-            new[world][regime] = g
+                m["aggression"] = round(max(0.1, min(1.5, m["aggression"] + random.uniform(-0.3, 0.3))), 2)
+            new[w][r] = m
     return new
 
 # -------------------------
@@ -68,19 +66,25 @@ def mutate_dna(dna):
 WORLD = {
     "step": 0,
     "generation": 1,
-    "agents": []
+    "agents": [],
+    "extinct_dna": 0
 }
 
-def spawn_agent(dna=None):
+# -------------------------
+# AGENT
+# -------------------------
+def spawn_agent(dna=None, capital=BASE_CAPITAL):
     return {
         "id": uuid.uuid4().hex[:8],
         "generation": WORLD["generation"],
         "alive": True,
-        "equity": INITIAL_EQUITY,
-        "peak": INITIAL_EQUITY,
+        "equity": capital,
+        "peak": capital,
         "last_return": 0.0,
         "dna": dna or random_dna(),
-        "score": {w: 0.0 for w in WORLDS}
+        "memory": {w: {r: 0.0 for r in REGIMES} for w in WORLDS},
+        "allocation": capital,
+        "score": 0.0
     }
 
 def reset_population(seed_dna=None):
@@ -94,26 +98,16 @@ def reset_population(seed_dna=None):
 # -------------------------
 # FITNESS
 # -------------------------
-def fitness(agent):
-    dd = (agent["peak"] - agent["equity"]) / agent["peak"]
-    multi_world_score = sum(agent["score"].values())
-    return agent["equity"] * (1 - dd) + multi_world_score * 15
+def fitness(a):
+    dd = (a["peak"] - a["equity"]) / max(a["peak"], 1)
+    memory_penalty = sum(abs(v) for w in a["memory"].values() for v in w.values())
+    return a["equity"] * (1 - dd) - memory_penalty * 500
 
 # -------------------------
-# REGIME + COUNCIL
+# REGIME
 # -------------------------
-def detect_regime(market):
+def regime(market):
     return market.get("trend", "sideways")
-
-def council_vote(agent, world, regime):
-    gene = agent["dna"][world][regime]
-    conviction = (
-        gene["risk"]
-        * gene["leverage"]
-        * gene["aggression"]
-        * random.uniform(0.7, 1.3)
-    )
-    return conviction
 
 # -------------------------
 # SIMULATION
@@ -122,23 +116,55 @@ def simulate_agent(agent, market):
     if not agent["alive"]:
         return
 
-    world = market.get("world", "crypto")
-    regime = detect_regime(market)
+    w = market.get("world", "crypto")
+    r = regime(market)
+    gene = agent["dna"][w][r]
 
-    vote = council_vote(agent, world, regime)
+    fear = agent["memory"][w][r]
+    conviction = (
+        gene["risk"]
+        * gene["leverage"]
+        * gene["aggression"]
+        * (1 - min(fear, 0.8))
+    )
+
     edge = random.uniform(-1, 1)
+    pnl = agent["equity"] * conviction * edge * 0.012
 
-    pnl = agent["equity"] * vote * edge * 0.01
     agent["equity"] += pnl
     agent["last_return"] = pnl / max(agent["equity"], 1)
 
     if agent["equity"] > agent["peak"]:
         agent["peak"] = agent["equity"]
 
-    agent["score"][world] += agent["last_return"]
+    # Memory (trauma)
+    if pnl < 0:
+        agent["memory"][w][r] += abs(agent["last_return"])
+    else:
+        agent["memory"][w][r] *= MEMORY_DECAY
 
-    if agent["equity"] < INITIAL_EQUITY * KILL_THRESHOLD:
+    agent["score"] += agent["last_return"]
+
+    if agent["equity"] < BASE_CAPITAL * EXTINCTION_THRESHOLD:
         agent["alive"] = False
+        WORLD["extinct_dna"] += 1
+
+# -------------------------
+# CAPITAL ALLOCATOR
+# -------------------------
+def allocate_capital():
+    alive = [a for a in WORLD["agents"] if a["alive"]]
+    if not alive:
+        return
+
+    total_fitness = sum(max(fitness(a), 1) for a in alive)
+    pool = BASE_CAPITAL * len(alive)
+
+    for a in alive:
+        share = max(fitness(a), 1) / total_fitness
+        a["allocation"] = pool * share
+        a["equity"] = a["allocation"]
+        a["peak"] = a["allocation"]
 
 # -------------------------
 # EVOLUTION
@@ -160,6 +186,7 @@ def simulate_market(market: Dict):
     for agent in WORLD["agents"]:
         simulate_agent(agent, market)
 
+    allocate_capital()
     evolution_step()
 
     champion = max(WORLD["agents"], key=fitness)
@@ -170,15 +197,17 @@ def simulate_market(market: Dict):
         "world": market.get("world"),
         "regime": market.get("trend"),
         "champion": champion["id"],
+        "extinct_dna": WORLD["extinct_dna"],
         "agents": WORLD["agents"]
     }
 
 @app.get("/")
 def root():
     return {
-        "status": "ClawBot Phase 23 running",
+        "status": "ClawBot Phase 24 running",
         "generation": WORLD["generation"],
-        "step": WORLD["step"]
+        "step": WORLD["step"],
+        "extinct_dna": WORLD["extinct_dna"]
     }
 
 @app.get("/dashboard")
