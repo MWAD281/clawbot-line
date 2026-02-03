@@ -1,25 +1,28 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from typing import Optional, Dict, List
+from typing import Dict, List, Optional
 import random
 import time
+import copy
 
 app = FastAPI(
-    title="ClawBot Phase 75 – Cognitive Evolution Core",
-    version="75.0.0",
-    description="Self-reflection, memory, fitness & evolution signals"
+    title="ClawBot Phase 80 – Darwin Core",
+    version="80.0.0",
+    description="Selection, death, rebirth, mutation, tournament"
 )
 
 # =========================
-# In-Memory State (SAFE)
+# GLOBAL STATE (IN-MEMORY)
 # =========================
 
-AGENT_MEMORY: Dict[int, List[Dict]] = {}
-AGENT_FITNESS: Dict[int, float] = {}
-AGENT_CONFIDENCE_HISTORY: Dict[int, List[float]] = {}
+AGENTS: Dict[int, Dict] = {}
+GENERATION = 80
+MAX_AGENTS = 5
+MIN_FITNESS = 0.55
+MUTATION_RATE = 0.15
 
 # =========================
-# Data Models
+# MODELS
 # =========================
 
 class MarketInput(BaseModel):
@@ -34,32 +37,48 @@ class SimulationResult(BaseModel):
     decision: str
     confidence: float
     fitness: float
-    reflection: str
+    genome: Dict
+    note: str
     timestamp: float
 
 
 # =========================
-# Root
+# INIT
+# =========================
+
+def create_genome():
+    return {
+        "risk": round(random.uniform(0.2, 0.8), 2),
+        "patience": round(random.uniform(0.2, 0.8), 2),
+        "aggression": round(random.uniform(0.2, 0.8), 2),
+    }
+
+
+def spawn_agent(agent_id: int):
+    AGENTS[agent_id] = {
+        "genome": create_genome(),
+        "fitness": round(random.uniform(0.6, 0.8), 3),
+        "history": [],
+        "alive": True
+    }
+
+
+for i in range(1, MAX_AGENTS + 1):
+    spawn_agent(i)
+
+# =========================
+# ROOT / HEALTH
 # =========================
 
 @app.get("/")
 def root():
     return {
         "status": "ClawBot online",
-        "phase": 75,
-        "features": [
-            "self_reflection",
-            "memory",
-            "fitness_tracking",
-            "evolution_signal"
-        ],
-        "ready": True
+        "phase": 80,
+        "agents_alive": sum(1 for a in AGENTS.values() if a["alive"]),
+        "darwinism": True
     }
 
-
-# =========================
-# Health Check
-# =========================
 
 @app.get("/health")
 def health():
@@ -67,84 +86,115 @@ def health():
 
 
 # =========================
-# Core Simulation
+# CORE SIMULATION
 # =========================
 
 @app.post("/simulate/market", response_model=SimulationResult)
 def simulate_market(input: MarketInput):
-    agent_id = random.randint(1, 5)
-    decision = random.choice(["BUY", "SELL", "HOLD"])
+    alive_agents = [i for i, a in AGENTS.items() if a["alive"]]
+    agent_id = random.choice(alive_agents)
+    agent = AGENTS[agent_id]
+
+    genome = agent["genome"]
+
+    # Decision logic (genome-influenced)
+    roll = random.random()
+    if roll < genome["aggression"]:
+        decision = "BUY"
+    elif roll > 1 - genome["risk"]:
+        decision = "SELL"
+    else:
+        decision = "HOLD"
+
     confidence = round(random.uniform(0.5, 0.95), 2)
 
-    # ---- Phase 72: Confidence Drift ----
-    history = AGENT_CONFIDENCE_HISTORY.setdefault(agent_id, [])
-    history.append(confidence)
-    if len(history) > 20:
-        history.pop(0)
+    # Fitness update
+    delta = (confidence - 0.5) * random.uniform(0.8, 1.2)
+    agent["fitness"] = round(
+        max(0.0, min(1.0, agent["fitness"] + delta * 0.1)),
+        3
+    )
 
-    avg_conf = sum(history) / len(history)
+    agent["history"].append(agent["fitness"])
+    if len(agent["history"]) > 30:
+        agent["history"].pop(0)
 
-    # ---- Phase 74: Fitness Score ----
-    fitness = round(avg_conf * random.uniform(0.9, 1.1), 3)
-    AGENT_FITNESS[agent_id] = fitness
+    note = "Stable"
 
-    # ---- Phase 71: Self Reflection ----
-    if confidence > avg_conf:
-        reflection = "Confidence improving"
-    elif confidence < avg_conf:
-        reflection = "Confidence declining"
-    else:
-        reflection = "Confidence stable"
+    # =========================
+    # Phase 77–78: Selection & Death
+    # =========================
 
-    # ---- Phase 73: Memory ----
-    memory = AGENT_MEMORY.setdefault(agent_id, [])
-    memory.append({
-        "decision": decision,
-        "confidence": confidence,
-        "fitness": fitness,
-        "timestamp": time.time()
-    })
-    if len(memory) > 50:
-        memory.pop(0)
+    if agent["fitness"] < MIN_FITNESS:
+        agent["alive"] = False
+        note = "Agent died (low fitness)"
 
-    # ---- Phase 75: Evolution Signal (soft) ----
-    if fitness < 0.55:
-        reflection += " | Evolution signal: WEAK"
-    elif fitness > 0.8:
-        reflection += " | Evolution signal: STRONG"
+        # Rebirth
+        dead_id = agent_id
+        spawn_agent(dead_id)
+        note += " → reborn with new genome"
+
+    # =========================
+    # Phase 79: Mutation
+    # =========================
+
+    if random.random() < MUTATION_RATE:
+        trait = random.choice(list(genome.keys()))
+        genome[trait] = round(
+            max(0.1, min(0.9, genome[trait] + random.uniform(-0.15, 0.15))),
+            2
+        )
+        note += f" | mutation on {trait}"
 
     return SimulationResult(
-        generation=75,
+        generation=GENERATION,
         agent_id=agent_id,
         decision=decision,
         confidence=confidence,
-        fitness=fitness,
-        reflection=reflection,
+        fitness=agent["fitness"],
+        genome=copy.deepcopy(genome),
+        note=note,
         timestamp=time.time()
     )
 
 
 # =========================
-# Debug / Introspection
+# TOURNAMENT (PHASE 80)
 # =========================
 
-@app.get("/agents")
-def agents_state():
+@app.get("/tournament")
+def tournament():
+    ranked = sorted(
+        AGENTS.items(),
+        key=lambda x: x[1]["fitness"],
+        reverse=True
+    )
+
+    winner_id, winner = ranked[0]
+
     return {
-        "agents": {
-            agent_id: {
-                "fitness": AGENT_FITNESS.get(agent_id),
-                "memory_size": len(AGENT_MEMORY.get(agent_id, [])),
-                "confidence_samples": len(AGENT_CONFIDENCE_HISTORY.get(agent_id, []))
-            }
-            for agent_id in range(1, 6)
-        }
+        "winner": winner_id,
+        "fitness": winner["fitness"],
+        "genome": winner["genome"],
+        "ranking": [
+            {"agent": i, "fitness": a["fitness"], "alive": a["alive"]}
+            for i, a in ranked
+        ]
     }
 
 
+# =========================
+# DEBUG / RESET
+# =========================
+
+@app.get("/agents")
+def agents():
+    return AGENTS
+
+
 @app.post("/reset")
-def reset_memory():
-    AGENT_MEMORY.clear()
-    AGENT_FITNESS.clear()
-    AGENT_CONFIDENCE_HISTORY.clear()
+def reset():
+    AGENTS.clear()
+    for i in range(1, MAX_AGENTS + 1):
+        spawn_agent(i)
     return {"reset": True}
