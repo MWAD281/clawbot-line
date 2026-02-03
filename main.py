@@ -4,11 +4,11 @@ from typing import Dict, List
 import random
 import uuid
 
-app = FastAPI(title="ClawBot Phase 28 – Autonomous Goal-Driven Civilization")
+app = FastAPI(title="ClawBot Phase 29 – Darwinian Multiverse")
 
-# =====================
+# ==================================================
 # CORS
-# =====================
+# ==================================================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,31 +17,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# =====================
+# ==================================================
 # CONFIG
-# =====================
-POPULATION = 20
+# ==================================================
+MAX_WORLDS = 4
+POPULATION = 15
 BASE_CAPITAL = 100_000
 EXTINCTION_LEVEL = 0.4
-GOALS = ["GROWTH", "SURVIVAL", "DOMINANCE"]
+
 WORLD_TYPES = ["crypto", "equity", "macro"]
 TRENDS = ["up", "down", "side"]
+GOALS = ["GROWTH", "SURVIVAL", "DOMINANCE"]
 
-# =====================
+# ==================================================
 # DNA
-# =====================
+# ==================================================
 def strategy_gene():
     return {
-        "risk": round(random.uniform(0.01, 0.2), 3),
-        "leverage": round(random.uniform(1, 12), 2),
-        "aggression": round(random.uniform(0.2, 2.5), 2),
+        "risk": round(random.uniform(0.01, 0.25), 3),
+        "leverage": round(random.uniform(1, 15), 2),
+        "aggression": round(random.uniform(0.2, 3.0), 2),
     }
 
 def meta_gene():
     return {
-        "mutation_rate": round(random.uniform(0.2, 0.8), 2),
-        "rule_breaker": round(random.uniform(0.0, 1.5), 2),
-        "adaptivity": round(random.uniform(0.2, 1.5), 2),
+        "mutation_rate": round(random.uniform(0.2, 0.9), 2),
+        "adaptivity": round(random.uniform(0.2, 2.0), 2),
+        "chaos": round(random.uniform(0.0, 2.0), 2),
     }
 
 def random_dna():
@@ -54,111 +56,108 @@ def random_dna():
     }
 
 def mutate_dna(dna):
-    m = dna["meta"]
-    new = {"strategy": {}, "meta": m.copy()}
+    new = {"strategy": {}, "meta": dna["meta"].copy()}
+    m = new["meta"]
 
-    if random.random() < 0.5:
-        new["meta"]["mutation_rate"] = round(
-            max(0.1, min(0.9, m["mutation_rate"] + random.uniform(-0.2, 0.2))), 2
-        )
-    if random.random() < 0.4:
-        new["meta"]["rule_breaker"] = round(
-            max(0.0, min(2.0, m["rule_breaker"] + random.uniform(-0.4, 0.4))), 2
-        )
-    if random.random() < 0.4:
-        new["meta"]["adaptivity"] = round(
-            max(0.1, min(2.0, m["adaptivity"] + random.uniform(-0.3, 0.3))), 2
-        )
+    for k in m:
+        if random.random() < 0.4:
+            m[k] = round(max(0.1, min(2.5, m[k] + random.uniform(-0.3, 0.3))), 2)
 
     for w in dna["strategy"]:
         new["strategy"][w] = {}
         for t in dna["strategy"][w]:
             g = dna["strategy"][w][t].copy()
-            if random.random() < new["meta"]["mutation_rate"]:
-                g["risk"] = round(max(0.005, min(0.3, g["risk"] + random.uniform(-0.05, 0.05))), 3)
-            if random.random() < new["meta"]["mutation_rate"]:
-                g["leverage"] = round(max(1.0, min(20.0, g["leverage"] + random.uniform(-4, 4))), 2)
-            if random.random() < new["meta"]["mutation_rate"]:
-                g["aggression"] = round(max(0.1, min(3.5, g["aggression"] + random.uniform(-0.7, 0.7))), 2)
+            if random.random() < m["mutation_rate"]:
+                g["risk"] = round(max(0.005, min(0.4, g["risk"] + random.uniform(-0.05, 0.05))), 3)
+            if random.random() < m["mutation_rate"]:
+                g["leverage"] = round(max(1, min(25, g["leverage"] + random.uniform(-4, 4))), 2)
+            if random.random() < m["mutation_rate"]:
+                g["aggression"] = round(max(0.1, min(4.0, g["aggression"] + random.uniform(-0.7, 0.7))), 2)
             new["strategy"][w][t] = g
 
     return new
 
-# =====================
-# WORLD STATE
-# =====================
-WORLD = {
-    "step": 0,
-    "generation": 1,
-    "law": {
-        "tax": 0.02,
-        "reward_mode": "equity",  # equity | survival | dominance
-    },
-    "culture": {
-        "dominant_goal": "GROWTH"
-    },
-    "agents": []
-}
-
-# =====================
+# ==================================================
 # AGENT
-# =====================
-def spawn_agent(dna=None, capital=BASE_CAPITAL):
+# ==================================================
+def spawn_agent(dna=None):
     return {
         "id": uuid.uuid4().hex[:8],
         "alive": True,
-        "equity": capital,
-        "peak": capital,
+        "equity": BASE_CAPITAL,
+        "peak": BASE_CAPITAL,
         "dna": dna or random_dna(),
         "goal": random.choice(GOALS),
-        "age": 0,
         "score": 0.0,
+        "age": 0,
     }
 
-# =====================
-# FITNESS (Goal-driven)
-# =====================
-def fitness(a):
-    dd = (a["peak"] - a["equity"]) / max(a["peak"], 1)
-    if a["goal"] == "GROWTH":
-        return a["equity"] * (1 - dd)
-    if a["goal"] == "SURVIVAL":
-        return a["equity"] * (1 - dd * 2)
-    if a["goal"] == "DOMINANCE":
-        return a["score"]
-    return a["equity"]
+def fitness(agent):
+    dd = (agent["peak"] - agent["equity"]) / max(agent["peak"], 1)
+    if agent["goal"] == "SURVIVAL":
+        return agent["equity"] * (1 - dd * 2)
+    if agent["goal"] == "DOMINANCE":
+        return agent["score"]
+    return agent["equity"]
 
-# =====================
-# GOAL ADAPTATION
-# =====================
+# ==================================================
+# WORLD
+# ==================================================
+def spawn_world(parent_dna=None):
+    return {
+        "id": uuid.uuid4().hex[:6],
+        "age": 0,
+        "law": {
+            "tax": round(random.uniform(0.01, 0.05), 3),
+        },
+        "culture": {
+            "dominant_goal": random.choice(GOALS)
+        },
+        "agents": [
+            spawn_agent(mutate_dna(parent_dna) if parent_dna else None)
+            for _ in range(POPULATION)
+        ],
+        "alive": True,
+        "score": 0.0
+    }
+
+# ==================================================
+# MULTIVERSE
+# ==================================================
+MULTIVERSE: List[Dict] = [spawn_world() for _ in range(2)]
+STEP = 0
+
+# ==================================================
+# SIMULATION
+# ==================================================
 def adapt_goal(agent):
     if agent["equity"] < BASE_CAPITAL * 0.7:
         agent["goal"] = "SURVIVAL"
-    elif agent["score"] > BASE_CAPITAL * 0.5:
+    elif agent["score"] > BASE_CAPITAL * 0.6:
         agent["goal"] = "DOMINANCE"
     elif agent["equity"] > agent["peak"] * 1.2:
         agent["goal"] = "GROWTH"
 
-# =====================
-# MARKET SIM
-# =====================
-def simulate_agent(agent, market):
+def simulate_agent(agent, market, world):
     if not agent["alive"]:
         return
 
     agent["age"] += 1
-    w, t = market["world"], market["trend"]
-    g = agent["dna"]["strategy"][w][t]
-    meta = agent["dna"]["meta"]
+    g = agent["dna"]["strategy"][market["world"]][market["trend"]]
+    m = agent["dna"]["meta"]
 
     edge = random.uniform(-1, 1)
-    chaos = random.uniform(-1, 1) * meta["rule_breaker"]
-    intent = 1.0 if agent["goal"] == "GROWTH" else (0.7 if agent["goal"] == "SURVIVAL" else 1.3)
+    chaos = random.uniform(-1, 1) * m["chaos"]
 
-    conviction = g["risk"] * g["leverage"] * g["aggression"] * intent
-    pnl = agent["equity"] * conviction * (edge + chaos) * 0.01
+    intent = 1.0
+    if agent["goal"] == "SURVIVAL":
+        intent = 0.6
+    elif agent["goal"] == "DOMINANCE":
+        intent = 1.4
 
-    tax = abs(pnl) * WORLD["law"]["tax"]
+    pnl = agent["equity"] * g["risk"] * g["leverage"] * g["aggression"] * intent * (edge + chaos) * 0.01
+    tax = abs(pnl) * world["law"]["tax"]
+
     agent["equity"] += pnl - tax
     agent["score"] += pnl
 
@@ -170,80 +169,85 @@ def simulate_agent(agent, market):
 
     adapt_goal(agent)
 
-# =====================
-# CULTURE & LAW EVOLUTION
-# =====================
-def evolve_culture_and_law():
-    goals = [a["goal"] for a in WORLD["agents"] if a["alive"]]
-    if goals:
-        WORLD["culture"]["dominant_goal"] = max(set(goals), key=goals.count)
+def simulate_world(world, market):
+    if not world["alive"]:
+        return
 
-    if WORLD["culture"]["dominant_goal"] == "SURVIVAL":
-        WORLD["law"]["reward_mode"] = "survival"
-        WORLD["law"]["tax"] = round(random.uniform(0.0, 0.01), 3)
-    elif WORLD["culture"]["dominant_goal"] == "DOMINANCE":
-        WORLD["law"]["reward_mode"] = "dominance"
-        WORLD["law"]["tax"] = round(random.uniform(0.02, 0.06), 3)
-    else:
-        WORLD["law"]["reward_mode"] = "equity"
-        WORLD["law"]["tax"] = round(random.uniform(0.01, 0.03), 3)
+    world["age"] += 1
 
-# =====================
-# REBIRTH
-# =====================
-def evolution_step():
-    alive = [a for a in WORLD["agents"] if a["alive"]]
-    if len(alive) <= 5:
-        champion = max(WORLD["agents"], key=fitness)
-        WORLD["generation"] += 1
-        WORLD["agents"] = [
-            spawn_agent(dna=mutate_dna(champion["dna"]))
-            for _ in range(POPULATION)
-        ]
+    for a in world["agents"]:
+        simulate_agent(a, market, world)
 
-# =====================
+    alive = [a for a in world["agents"] if a["alive"]]
+    if not alive:
+        world["alive"] = False
+        return
+
+    champ = max(alive, key=fitness)
+    world["culture"]["dominant_goal"] = champ["goal"]
+    world["score"] = sum(a["equity"] for a in alive)
+
+# ==================================================
+# WORLD EVOLUTION
+# ==================================================
+def evolve_multiverse():
+    global MULTIVERSE
+
+    alive_worlds = [w for w in MULTIVERSE if w["alive"]]
+
+    if len(alive_worlds) == 0:
+        MULTIVERSE = [spawn_world()]
+        return
+
+    if len(alive_worlds) < MAX_WORLDS:
+        parent = max(alive_worlds, key=lambda w: w["score"])
+        champ = max(parent["agents"], key=fitness)
+        MULTIVERSE.append(spawn_world(parent_dna=champ["dna"]))
+
+    if len(alive_worlds) > 1:
+        worst = min(alive_worlds, key=lambda w: w["score"])
+        if worst["score"] < BASE_CAPITAL * POPULATION * 0.3:
+            worst["alive"] = False
+
+# ==================================================
 # API
-# =====================
+# ==================================================
 @app.post("/simulate/market")
 def simulate_market(market: Dict):
-    WORLD["step"] += 1
+    global STEP
+    STEP += 1
 
-    for a in WORLD["agents"]:
-        simulate_agent(a, market)
+    for w in MULTIVERSE:
+        simulate_world(w, market)
 
-    evolve_culture_and_law()
-    evolution_step()
-
-    champ = max(WORLD["agents"], key=fitness)
+    evolve_multiverse()
 
     return {
-        "step": WORLD["step"],
-        "generation": WORLD["generation"],
-        "culture": WORLD["culture"],
-        "law": WORLD["law"],
-        "champion": champ["id"],
-        "agents": WORLD["agents"],
+        "step": STEP,
+        "worlds": [
+            {
+                "id": w["id"],
+                "alive": w["alive"],
+                "age": w["age"],
+                "score": round(w["score"], 2),
+                "culture": w["culture"],
+                "agents_alive": len([a for a in w["agents"] if a["alive"]]),
+            }
+            for w in MULTIVERSE
+        ]
     }
 
 @app.get("/")
 def root():
     return {
-        "status": "ClawBot Phase 28 online",
-        "generation": WORLD["generation"],
-        "culture": WORLD["culture"],
-        "law": WORLD["law"],
+        "status": "ClawBot Phase 29 online",
+        "step": STEP,
+        "worlds": len(MULTIVERSE),
     }
 
 @app.get("/dashboard")
 def dashboard():
     return {
-        "generation": WORLD["generation"],
-        "culture": WORLD["culture"],
-        "law": WORLD["law"],
-        "agents": sorted(WORLD["agents"], key=fitness, reverse=True),
+        "step": STEP,
+        "multiverse": MULTIVERSE
     }
-
-# =====================
-# INIT
-# =====================
-WORLD["agents"] = [spawn_agent() for _ in range(POPULATION)]
