@@ -8,7 +8,7 @@ import copy
 import statistics
 
 app = FastAPI(
-    title="ClawBot Phase 45 – Capital Allocator",
+    title="ClawBot Phase 46 – Agent Specialization",
     version="1.0.0"
 )
 
@@ -35,28 +35,33 @@ class MarketInput(BaseModel):
 # =========================
 # Config
 # =========================
-POPULATION_SIZE = 6
-TOTAL_CAPITAL = 600_000.0
+POPULATION_SIZE = 8
+TOTAL_CAPITAL = 800_000.0
 BASE_CAPITAL = TOTAL_CAPITAL / POPULATION_SIZE
+
 MAX_DRAWDOWN = 0.35
 CRITICAL_DRAWDOWN = 0.20
+
 TAKER_FEE = 0.0006
 SLIPPAGE_BASE = 0.0005
-MEMORY_LIMIT = 30
-HOF_LIMIT = 8
+
+MEMORY_LIMIT = 40
+HOF_LIMIT = 10
 
 GENERATION = 1
 AGENTS: Dict[str, dict] = {}
 HALL_OF_FAME: List[dict] = []
+
+STRATEGY_ROLES = ["TREND", "MEAN", "SCALP", "CRISIS"]
 
 # =========================
 # Genetics
 # =========================
 def random_gene():
     return {
-        "aggression": round(random.uniform(0.1, 1.0), 2),
-        "risk_tolerance": round(random.uniform(0.1, 1.0), 2),
-        "adaptability": round(random.uniform(0.1, 1.0), 2),
+        "aggression": round(random.uniform(0.2, 1.0), 2),
+        "risk_tolerance": round(random.uniform(0.2, 1.0), 2),
+        "adaptability": round(random.uniform(0.2, 1.0), 2),
         "base_position": round(random.uniform(0.05, 0.5), 2),
         "trend_bias": random.choice(["bull", "bear", "neutral"])
     }
@@ -76,11 +81,12 @@ def crossover(g1, g2):
 # =========================
 # Agent Factory
 # =========================
-def spawn_agent(parent_gene=None, capital=BASE_CAPITAL):
+def spawn_agent(parent_gene=None, role=None, capital=BASE_CAPITAL):
     aid = str(uuid.uuid4())[:8]
     gene = mutate_gene(parent_gene) if parent_gene else random_gene()
     AGENTS[aid] = {
         "id": aid,
+        "role": role or random.choice(STRATEGY_ROLES),
         "gene": gene,
         "capital": capital,
         "equity": capital,
@@ -99,9 +105,9 @@ for _ in range(POPULATION_SIZE):
 # Market
 # =========================
 def detect_regime(m: MarketInput):
-    if m.momentum > 0.4:
+    if m.momentum > 0.5:
         return "BULL"
-    if m.momentum < -0.4:
+    if m.momentum < -0.5:
         return "BEAR"
     return "SIDEWAYS"
 
@@ -125,23 +131,36 @@ def memory_bias(agent, snapshot):
     return sum(weighted) / len(weighted)
 
 # =========================
-# Decision Engine
+# Decision Engine (By Role)
 # =========================
 def decide(agent, market, regime):
-    snapshot = {"regime": regime, "momentum": market.momentum}
-    mem = memory_bias(agent, snapshot)
+    role = agent["role"]
+    mem = memory_bias(agent, {"regime": regime, "momentum": market.momentum})
     adapt = agent["gene"]["adaptability"]
-    bias = agent["gene"]["trend_bias"].upper()
 
-    if mem > 0.02:
-        return "ENTER"
-    if mem < -0.02:
+    if role == "TREND":
+        if abs(market.momentum) > 0.4:
+            return "ENTER"
         return "HOLD"
 
-    if bias == regime and adapt > 0.4:
+    if role == "MEAN":
+        if regime == "SIDEWAYS" and abs(market.momentum) < 0.3:
+            return "ENTER"
+        return "HOLD"
+
+    if role == "SCALP":
+        if market.volatility == "high":
+            return "SCALP"
+        return "HOLD"
+
+    if role == "CRISIS":
+        if market.momentum < -0.7:
+            return "ENTER"
+        return "HOLD"
+
+    if mem > 0.02 and adapt > 0.4:
         return "ENTER"
-    if adapt > 0.7:
-        return "SCALP"
+
     return "HOLD"
 
 # =========================
@@ -153,8 +172,16 @@ def slippage(market):
 def position_size(agent, regime):
     base = agent["gene"]["base_position"]
     risk = agent["gene"]["risk_tolerance"]
+
+    role_mult = {
+        "TREND": 1.2,
+        "MEAN": 0.8,
+        "SCALP": 0.5,
+        "CRISIS": 1.5
+    }[agent["role"]]
+
     adj = 1.0 if regime != "SIDEWAYS" else 0.6
-    return max(0.01, min(0.7, base * risk * adj))
+    return max(0.01, min(0.7, base * risk * role_mult * adj))
 
 def open_position(agent, side, price, size, market):
     fill = price * (1 + slippage(market) if side == "LONG" else 1 - slippage(market))
@@ -197,7 +224,7 @@ def risk(agent):
         agent["position"]["size"] *= 0.5
 
 # =========================
-# Capital Allocator
+# Capital Allocator (By Role)
 # =========================
 def score_agent(agent):
     if len(agent["returns"]) < 3:
@@ -212,11 +239,11 @@ def allocate_capital():
         return
 
     scores = {a["id"]: max(0, score_agent(a)) for a in alive}
-    total_score = sum(scores.values()) or 1
+    total = sum(scores.values()) or 1
 
     for a in alive:
-        target = TOTAL_CAPITAL * (scores[a["id"]] / total_score)
-        a["capital"] = max(10_000, target)
+        target = TOTAL_CAPITAL * (scores[a["id"]] / total)
+        a["capital"] = max(20_000, target)
 
 # =========================
 # Evolution
@@ -237,18 +264,20 @@ def evolve():
 
     HALL_OF_FAME.append({
         "gene": champ["gene"],
+        "role": champ["role"],
         "capital": round(champ["capital"], 2),
         "gen": GENERATION
     })
     HALL_OF_FAME.sort(key=lambda x: x["capital"], reverse=True)
     del HALL_OF_FAME[HOF_LIMIT:]
 
-    survivors = ranked[:max(2, len(ranked)//2)]
+    survivors = ranked[:max(3, len(ranked)//2)]
     AGENTS = {a["id"]: a for a in survivors}
 
     while len(AGENTS) < POPULATION_SIZE:
-        g = crossover(champ["gene"], random.choice(survivors)["gene"])
-        spawn_agent(g)
+        parent = random.choice(survivors)
+        g = crossover(champ["gene"], parent["gene"])
+        spawn_agent(g, role=parent["role"])
 
 # =========================
 # Routes
@@ -256,7 +285,7 @@ def evolve():
 @app.get("/")
 def root():
     return {
-        "status": "ClawBot Phase 45 ONLINE",
+        "status": "ClawBot Phase 46 ONLINE",
         "generation": GENERATION,
         "agents": len(AGENTS)
     }
@@ -284,7 +313,7 @@ def simulate(market: MarketInput):
     evolve()
 
     return {
-        "phase": 45,
+        "phase": 46,
         "generation": GENERATION,
         "regime": regime,
         "agents_alive": len([a for a in AGENTS.values() if a["alive"]])
@@ -293,11 +322,11 @@ def simulate(market: MarketInput):
 @app.get("/dashboard")
 def dashboard():
     return {
-        "phase": 45,
+        "phase": 46,
         "generation": GENERATION,
         "agents": list(AGENTS.values()),
         "hall_of_fame": HALL_OF_FAME,
-        "allocator": "ACTIVE"
+        "allocator": "ROLE_BASED"
     }
 
 @app.post("/line/webhook")
