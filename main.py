@@ -8,7 +8,7 @@ import copy
 import statistics
 
 app = FastAPI(
-    title="ClawBot Phase 47 – Meta Allocator",
+    title="ClawBot Phase 48 – Portfolio Risk Governor",
     version="1.0.0"
 )
 
@@ -41,6 +41,11 @@ BASE_CAPITAL = TOTAL_CAPITAL / POPULATION_SIZE
 
 MAX_DRAWDOWN = 0.35
 CRITICAL_DRAWDOWN = 0.20
+
+# Portfolio Risk
+PORTFOLIO_MAX_DD = 0.25
+VAR_LIMIT = 0.04          # 4% daily VaR
+RISK_REDUCTION_FACTOR = 0.5
 
 TAKER_FEE = 0.0006
 SLIPPAGE_BASE = 0.0005
@@ -112,14 +117,13 @@ def detect_regime(m: MarketInput):
     return "SIDEWAYS"
 
 # =========================
-# Meta Allocator (NEW)
+# Meta Allocator
 # =========================
 def regime_weights(regime: str, volatility: str):
     if regime == "BULL":
         return {"TREND": 0.45, "MEAN": 0.15, "SCALP": 0.25, "CRISIS": 0.15}
     if regime == "BEAR":
         return {"TREND": 0.15, "MEAN": 0.20, "SCALP": 0.20, "CRISIS": 0.45}
-    # SIDEWAYS
     base = {"TREND": 0.15, "MEAN": 0.45, "SCALP": 0.30, "CRISIS": 0.10}
     if volatility == "high":
         base["SCALP"] += 0.1
@@ -160,10 +164,8 @@ def decide(agent, market, regime):
         return "SCALP"
     if role == "CRISIS" and market.momentum < -0.7:
         return "ENTER"
-
     if mem > 0.02:
         return "ENTER"
-
     return "HOLD"
 
 # =========================
@@ -172,10 +174,16 @@ def decide(agent, market, regime):
 def slippage(market):
     return SLIPPAGE_BASE * {"loose": 0.8, "normal": 1.0, "tight": 1.6}[market.liquidity]
 
-def position_size(agent):
-    return max(0.01, min(0.6,
-        agent["gene"]["base_position"] * agent["gene"]["risk_tolerance"]
-    ))
+def position_size(agent, risk_factor=1.0):
+    return max(
+        0.01,
+        min(
+            0.6,
+            agent["gene"]["base_position"]
+            * agent["gene"]["risk_tolerance"]
+            * risk_factor
+        )
+    )
 
 def open_position(agent, side, price, size, market):
     fill = price * (1 + slippage(market) if side == "LONG" else 1 - slippage(market))
@@ -192,8 +200,7 @@ def close_position(agent, price, market, regime, momentum):
 
     pnl = agent["capital"] * pos["size"] * pnl_ratio
     fee = abs(pnl) * TAKER_FEE
-    net = pnl - fee
-    agent["capital"] += net
+    agent["capital"] += pnl - fee
     agent["returns"].append(pnl_ratio)
 
     agent["memory"].append({
@@ -205,49 +212,29 @@ def close_position(agent, price, market, regime, momentum):
     agent["position"] = None
 
 # =========================
-# Risk
+# Portfolio Risk Engine (NEW)
 # =========================
-def risk(agent):
-    agent["equity"] = agent["capital"]
-    agent["peak"] = max(agent["peak"], agent["equity"])
-    dd = 1 - agent["equity"] / agent["peak"]
+def portfolio_equity():
+    return sum(a["capital"] for a in AGENTS.values() if a["alive"])
 
-    if dd >= MAX_DRAWDOWN:
-        agent["alive"] = False
-    elif dd >= CRITICAL_DRAWDOWN and agent["position"]:
-        agent["position"]["size"] *= 0.5
+def portfolio_returns():
+    rets = []
+    for a in AGENTS.values():
+        rets.extend(a["returns"][-5:])
+    return rets
 
-# =========================
-# Capital Allocation (Meta)
-# =========================
-def score_agent(agent):
-    if len(agent["returns"]) < 3:
-        return 0.1
-    avg = statistics.mean(agent["returns"])
-    vol = statistics.stdev(agent["returns"]) if len(agent["returns"]) > 1 else 0.01
-    return max(0.05, avg / max(0.01, vol))
+def portfolio_var():
+    r = portfolio_returns()
+    if len(r) < 5:
+        return 0.0
+    mu = statistics.mean(r)
+    sigma = statistics.stdev(r)
+    return abs(mu - 2 * sigma)
 
-def allocate_capital(regime, volatility):
-    alive = [a for a in AGENTS.values() if a["alive"]]
-    if not alive:
-        return
-
-    weights = regime_weights(regime, volatility)
-    role_groups: Dict[str, List[dict]] = {}
-
-    for a in alive:
-        role_groups.setdefault(a["role"], []).append(a)
-
-    for role, agents in role_groups.items():
-        pool = TOTAL_CAPITAL * weights.get(role, 0.1)
-        scores = {a["id"]: score_agent(a) for a in agents}
-        total = sum(scores.values()) or 1
-
-        for a in agents:
-            a["capital"] = max(
-                20_000,
-                pool * (scores[a["id"]] / total)
-            )
+def portfolio_drawdown():
+    total = portfolio_equity()
+    peak = max(TOTAL_CAPITAL, total)
+    return 1 - total / peak
 
 # =========================
 # Evolution
@@ -289,48 +276,58 @@ def evolve():
 @app.get("/")
 def root():
     return {
-        "status": "ClawBot Phase 47 ONLINE",
+        "status": "ClawBot Phase 48 ONLINE",
         "generation": GENERATION,
-        "agents": len(AGENTS)
+        "portfolio_equity": round(portfolio_equity(), 2)
     }
 
 @app.post("/simulate/market")
 def simulate(market: MarketInput):
     regime = detect_regime(market)
 
-    for agent in list(AGENTS.values()):
+    var = portfolio_var()
+    dd = portfolio_drawdown()
+    risk_factor = 1.0
+
+    if var > VAR_LIMIT:
+        risk_factor *= RISK_REDUCTION_FACTOR
+
+    if dd > PORTFOLIO_MAX_DD:
+        for a in AGENTS.values():
+            a["position"] = None
+        return {"status": "PORTFOLIO KILL SWITCH ACTIVATED"}
+
+    for agent in AGENTS.values():
         if not agent["alive"]:
             continue
-
-        decision = decide(agent, market, regime)
 
         if agent["position"]:
             close_position(agent, market.price, market, regime, market.momentum)
 
+        decision = decide(agent, market, regime)
         if decision in ["ENTER", "SCALP"]:
             side = "LONG" if regime == "BULL" else "SHORT"
-            open_position(agent, side, market.price, position_size(agent), market)
+            open_position(agent, side, market.price, position_size(agent, risk_factor), market)
 
-        risk(agent)
-
-    allocate_capital(regime, market.volatility)
     evolve()
 
     return {
-        "phase": 47,
+        "phase": 48,
         "generation": GENERATION,
         "regime": regime,
-        "agents_alive": len([a for a in AGENTS.values() if a["alive"]])
+        "portfolio_var": round(var, 4),
+        "portfolio_dd": round(dd, 4)
     }
 
 @app.get("/dashboard")
 def dashboard():
     return {
-        "phase": 47,
+        "phase": 48,
         "generation": GENERATION,
+        "portfolio_equity": portfolio_equity(),
+        "portfolio_var": portfolio_var(),
         "agents": list(AGENTS.values()),
-        "hall_of_fame": HALL_OF_FAME,
-        "allocator": "META_REGIME"
+        "hall_of_fame": HALL_OF_FAME
     }
 
 @app.post("/line/webhook")
