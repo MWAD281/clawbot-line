@@ -3,14 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, List
 import random
 import uuid
-import time
 import copy
 
 # ==================================================
 # APP
 # ==================================================
 
-app = FastAPI(title="ClawBot Phase 32 – Regime-Aware Darwinism")
+app = FastAPI(title="ClawBot Phase 33 – Multi-Market Extinction")
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,37 +23,39 @@ app.add_middleware(
 # CONFIG
 # ==================================================
 
-POPULATION_SIZE = 10
+POPULATION_SIZE = 12
 INITIAL_CASH = 100_000
-EXTINCTION_LEVEL = 0.5
-MUTATION_RATE = 0.28
-MEMORY_DECAY = 0.90
-WORLD_PRESSURE_GROWTH = 1.12
+EXTINCTION_LEVEL = 0.45
+MUTATION_RATE = 0.30
+PRESSURE_GROWTH = 1.15
+
+MARKETS = ["EQUITY", "CRYPTO", "COMMODITY"]
 
 # ==================================================
-# WORLD STATE
+# WORLD
 # ==================================================
 
 WORLD = {
     "epoch": 0,
     "generation": 1,
     "pressure": 1.0,
-    "regime": "NEUTRAL",
+    "active_market": "EQUITY",
     "agents": [],
     "lineages": [],
-    "graveyard": []
+    "extinction_events": []
 }
 
 # ==================================================
-# DNA / LINEAGE
+# DNA
 # ==================================================
 
 def random_dna():
     return {
-        "risk": round(random.uniform(0.01, 0.06), 3),
-        "leverage": round(random.uniform(1.0, 4.0), 2),
+        "risk": round(random.uniform(0.01, 0.07), 3),
+        "leverage": round(random.uniform(1.0, 4.5), 2),
         "aggression": round(random.uniform(0.2, 1.0), 2),
-        "discipline": round(random.uniform(0.3, 0.9), 2),
+        "discipline": round(random.uniform(0.3, 0.95), 2),
+        "market_bias": random.choice(MARKETS),
         "regime_bias": random.choice(["RISK_ON", "RISK_OFF", "VOLATILE"])
     }
 
@@ -63,17 +64,13 @@ def mutate_dna(dna):
     for k in d:
         if random.random() < MUTATION_RATE:
             if isinstance(d[k], float):
-                d[k] = round(max(0.01, d[k] + random.uniform(-0.12, 0.12)), 3)
+                d[k] = round(max(0.01, d[k] + random.uniform(-0.15, 0.15)), 3)
             elif isinstance(d[k], str):
-                d[k] = random.choice(["RISK_ON", "RISK_OFF", "VOLATILE"])
+                if k == "market_bias":
+                    d[k] = random.choice(MARKETS)
+                else:
+                    d[k] = random.choice(["RISK_ON", "RISK_OFF", "VOLATILE"])
     return d
-
-def new_memory():
-    return {
-        "confidence": 0.5,
-        "trauma": 0.0,
-        "adaptation": 0.5
-    }
 
 # ==================================================
 # AGENT
@@ -87,33 +84,43 @@ def spawn_agent(dna=None, lineage=None):
         "equity": INITIAL_CASH,
         "peak": INITIAL_CASH,
         "dna": dna or random_dna(),
-        "memory": new_memory(),
+        "memory": {
+            "confidence": 0.5,
+            "trauma": 0.0
+        },
         "lineage": lineage or uuid.uuid4().hex[:6],
         "last_pnl": 0.0
     }
 
-def reset_population(seed_agent):
+def reset_population(champion):
     WORLD["agents"] = []
     for _ in range(POPULATION_SIZE):
         WORLD["agents"].append(
             spawn_agent(
-                dna=mutate_dna(seed_agent["dna"]),
-                lineage=seed_agent["lineage"]
+                dna=mutate_dna(champion["dna"]),
+                lineage=champion["lineage"]
             )
         )
 
 # ==================================================
-# REGIME ENGINE
+# REGIME / MARKET
 # ==================================================
 
-def infer_regime(market: Dict):
-    if market.get("volatility", 1) > 1.5:
+def infer_regime(market):
+    if market["volatility"] > 1.6:
         return "VOLATILE"
-    if market.get("trend") == "up":
+    if market["trend"] == "up":
         return "RISK_ON"
-    if market.get("trend") == "down":
+    if market["trend"] == "down":
         return "RISK_OFF"
     return "NEUTRAL"
+
+def market_multiplier(market_type):
+    return {
+        "EQUITY": 1.0,
+        "CRYPTO": 1.6,
+        "COMMODITY": 0.8
+    }[market_type]
 
 # ==================================================
 # FITNESS
@@ -121,11 +128,10 @@ def infer_regime(market: Dict):
 
 def fitness(a):
     dd = (a["peak"] - a["equity"]) / max(a["peak"], 1)
-    mem = a["memory"]
-    return a["equity"] * (1 - dd) * (1 - mem["trauma"]) * mem["confidence"]
+    return a["equity"] * (1 - dd) * a["memory"]["confidence"]
 
 # ==================================================
-# SIMULATION CORE
+# SIMULATION
 # ==================================================
 
 def simulate_agent(agent, market):
@@ -135,8 +141,8 @@ def simulate_agent(agent, market):
     dna = agent["dna"]
     mem = agent["memory"]
 
-    regime_match = 1.2 if dna["regime_bias"] == WORLD["regime"] else 0.8
-    volatility = market.get("volatility", 1.0)
+    regime_match = 1.2 if dna["regime_bias"] == market["regime"] else 0.75
+    market_match = 1.3 if dna["market_bias"] == WORLD["active_market"] else 0.7
 
     edge = random.uniform(-1, 1)
 
@@ -146,7 +152,8 @@ def simulate_agent(agent, market):
         * dna["leverage"]
         * dna["aggression"]
         * regime_match
-        * volatility
+        * market_match
+        * market["volatility"]
         * WORLD["pressure"]
         * edge
     )
@@ -157,23 +164,21 @@ def simulate_agent(agent, market):
     agent["last_pnl"] = pnl
 
     if pnl > 0:
-        mem["confidence"] = min(1.0, mem["confidence"] + 0.06)
-        mem["adaptation"] = min(1.0, mem["adaptation"] + 0.04)
+        mem["confidence"] = min(1.0, mem["confidence"] + 0.05)
     else:
-        mem["trauma"] = min(1.0, mem["trauma"] + 0.1)
-        mem["confidence"] = max(0.0, mem["confidence"] - 0.08)
+        mem["trauma"] = min(1.0, mem["trauma"] + 0.12)
+        mem["confidence"] = max(0.0, mem["confidence"] - 0.07)
 
-    mem["trauma"] *= MEMORY_DECAY
+    mem["trauma"] *= 0.9
 
     if agent["equity"] > agent["peak"]:
         agent["peak"] = agent["equity"]
 
     if agent["equity"] < INITIAL_CASH * EXTINCTION_LEVEL:
         agent["alive"] = False
-        WORLD["graveyard"].append(agent)
 
 # ==================================================
-# EVOLUTION
+# EVOLUTION + EXTINCTION CASCADE
 # ==================================================
 
 def evolve():
@@ -191,7 +196,14 @@ def evolve():
         })
 
         WORLD["generation"] += 1
-        WORLD["pressure"] *= WORLD_PRESSURE_GROWTH
+        WORLD["pressure"] *= PRESSURE_GROWTH
+
+        WORLD["extinction_events"].append({
+            "gen": WORLD["generation"],
+            "market": WORLD["active_market"],
+            "pressure": round(WORLD["pressure"], 2)
+        })
+
         reset_population(champion)
 
 # ==================================================
@@ -201,7 +213,9 @@ def evolve():
 @app.post("/simulate/market")
 def simulate_market(market: Dict):
     WORLD["epoch"] += 1
-    WORLD["regime"] = infer_regime(market)
+
+    WORLD["active_market"] = market.get("market", random.choice(MARKETS))
+    market["regime"] = infer_regime(market)
 
     for a in WORLD["agents"]:
         simulate_agent(a, market)
@@ -213,8 +227,9 @@ def simulate_market(market: Dict):
     return {
         "epoch": WORLD["epoch"],
         "generation": WORLD["generation"],
-        "regime": WORLD["regime"],
-        "pressure": round(WORLD["pressure"], 3),
+        "market": WORLD["active_market"],
+        "regime": market["regime"],
+        "pressure": round(WORLD["pressure"], 2),
         "champion": champion["id"],
         "agents": [
             {
@@ -222,7 +237,7 @@ def simulate_market(market: Dict):
                 "eq": round(a["equity"], 2),
                 "alive": a["alive"],
                 "conf": round(a["memory"]["confidence"], 2),
-                "trauma": round(a["memory"]["trauma"], 2),
+                "market_bias": a["dna"]["market_bias"],
                 "lineage": a["lineage"]
             } for a in WORLD["agents"]
         ]
@@ -231,18 +246,21 @@ def simulate_market(market: Dict):
 @app.get("/")
 def root():
     return {
-        "status": "ClawBot Phase 32 ONLINE",
+        "status": "ClawBot Phase 33 ONLINE",
         "epoch": WORLD["epoch"],
         "generation": WORLD["generation"],
-        "regime": WORLD["regime"],
-        "pressure": round(WORLD["pressure"], 3),
-        "graveyard": len(WORLD["graveyard"]),
+        "pressure": round(WORLD["pressure"], 2),
+        "extinctions": len(WORLD["extinction_events"]),
         "lineages": len(WORLD["lineages"])
     }
 
 @app.get("/lineages")
 def lineages():
     return WORLD["lineages"][-10:]
+
+@app.get("/extinctions")
+def extinctions():
+    return WORLD["extinction_events"][-10:]
 
 # ==================================================
 # INIT
