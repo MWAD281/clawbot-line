@@ -4,7 +4,7 @@ from typing import Dict
 import random
 import uuid
 
-app = FastAPI(title="ClawBot Phase 24 – True Darwinism")
+app = FastAPI(title="ClawBot Phase 25 – Civilization Darwinism")
 
 # -------------------------
 # CORS
@@ -20,11 +20,14 @@ app.add_middleware(
 # -------------------------
 # CONFIG
 # -------------------------
-POPULATION_SIZE = 10
+POPULATION_SIZE = 12
 BASE_CAPITAL = 100_000
-EXTINCTION_THRESHOLD = 0.5
-MUTATION_RATE = 0.35
-MEMORY_DECAY = 0.92
+EXTINCTION_THRESHOLD = 0.45
+MUTATION_RATE = 0.4
+MEMORY_DECAY = 0.9
+
+BLACK_SWAN_PROB = 0.08
+BLACK_SWAN_IMPACT = (-0.6, 0.6)
 
 WORLDS = ["crypto", "equity", "macro"]
 REGIMES = ["up", "down", "sideways"]
@@ -34,30 +37,27 @@ REGIMES = ["up", "down", "sideways"]
 # -------------------------
 def gene():
     return {
-        "risk": round(random.uniform(0.01, 0.07), 3),
-        "leverage": round(random.uniform(1.0, 5.0), 2),
-        "aggression": round(random.uniform(0.2, 1.2), 2),
+        "risk": round(random.uniform(0.01, 0.09), 3),
+        "leverage": round(random.uniform(1.0, 6.0), 2),
+        "aggression": round(random.uniform(0.2, 1.4), 2),
     }
 
 def random_dna():
-    return {
-        w: {r: gene() for r in REGIMES}
-        for w in WORLDS
-    }
+    return {w: {r: gene() for r in REGIMES} for w in WORLDS}
 
 def mutate_dna(dna):
     new = {}
-    for w, regimes in dna.items():
+    for w in dna:
         new[w] = {}
-        for r, g in regimes.items():
-            m = g.copy()
+        for r in dna[w]:
+            g = dna[w][r].copy()
             if random.random() < MUTATION_RATE:
-                m["risk"] = round(max(0.005, min(0.12, m["risk"] + random.uniform(-0.02, 0.02))), 3)
+                g["risk"] = round(max(0.005, min(0.15, g["risk"] + random.uniform(-0.03, 0.03))), 3)
             if random.random() < MUTATION_RATE:
-                m["leverage"] = round(max(1.0, min(7.0, m["leverage"] + random.uniform(-1, 1))), 2)
+                g["leverage"] = round(max(1.0, min(8.0, g["leverage"] + random.uniform(-1.2, 1.2))), 2)
             if random.random() < MUTATION_RATE:
-                m["aggression"] = round(max(0.1, min(1.5, m["aggression"] + random.uniform(-0.3, 0.3))), 2)
-            new[w][r] = m
+                g["aggression"] = round(max(0.1, min(1.7, g["aggression"] + random.uniform(-0.4, 0.4))), 2)
+            new[w][r] = g
     return new
 
 # -------------------------
@@ -66,42 +66,65 @@ def mutate_dna(dna):
 WORLD = {
     "step": 0,
     "generation": 1,
-    "agents": [],
-    "extinct_dna": 0
+    "species_counter": 0,
+    "dynasties": {},
+    "agents": []
 }
 
 # -------------------------
-# AGENT
+# AGENT / SPECIES
 # -------------------------
-def spawn_agent(dna=None, capital=BASE_CAPITAL):
+def spawn_agent(dna=None, species_id=None, capital=BASE_CAPITAL):
+    if species_id is None:
+        WORLD["species_counter"] += 1
+        species_id = f"S{WORLD['species_counter']}"
+
+    if species_id not in WORLD["dynasties"]:
+        WORLD["dynasties"][species_id] = {
+            "born": WORLD["generation"],
+            "champions": 0,
+            "alive": 0
+        }
+
+    WORLD["dynasties"][species_id]["alive"] += 1
+
     return {
         "id": uuid.uuid4().hex[:8],
+        "species": species_id,
         "generation": WORLD["generation"],
         "alive": True,
         "equity": capital,
         "peak": capital,
-        "last_return": 0.0,
         "dna": dna or random_dna(),
         "memory": {w: {r: 0.0 for r in REGIMES} for w in WORLDS},
-        "allocation": capital,
         "score": 0.0
     }
 
-def reset_population(seed_dna=None):
+def reset_population(seed):
     WORLD["agents"] = []
     for _ in range(POPULATION_SIZE):
-        if seed_dna:
-            WORLD["agents"].append(spawn_agent(mutate_dna(seed_dna)))
+        if random.random() < 0.3:
+            WORLD["agents"].append(
+                spawn_agent(
+                    dna=mutate_dna(seed["dna"]),
+                    species_id=None
+                )
+            )
         else:
-            WORLD["agents"].append(spawn_agent())
+            WORLD["agents"].append(
+                spawn_agent(
+                    dna=mutate_dna(seed["dna"]),
+                    species_id=seed["species"]
+                )
+            )
 
 # -------------------------
 # FITNESS
 # -------------------------
 def fitness(a):
     dd = (a["peak"] - a["equity"]) / max(a["peak"], 1)
-    memory_penalty = sum(abs(v) for w in a["memory"].values() for v in w.values())
-    return a["equity"] * (1 - dd) - memory_penalty * 500
+    trauma = sum(abs(v) for w in a["memory"].values() for v in w.values())
+    return a["equity"] * (1 - dd) - trauma * 600
 
 # -------------------------
 # REGIME
@@ -112,69 +135,47 @@ def regime(market):
 # -------------------------
 # SIMULATION
 # -------------------------
-def simulate_agent(agent, market):
+def simulate_agent(agent, market, black_swan=False):
     if not agent["alive"]:
         return
 
     w = market.get("world", "crypto")
     r = regime(market)
-    gene = agent["dna"][w][r]
+    g = agent["dna"][w][r]
 
     fear = agent["memory"][w][r]
-    conviction = (
-        gene["risk"]
-        * gene["leverage"]
-        * gene["aggression"]
-        * (1 - min(fear, 0.8))
-    )
+    conviction = g["risk"] * g["leverage"] * g["aggression"] * (1 - min(fear, 0.9))
 
     edge = random.uniform(-1, 1)
-    pnl = agent["equity"] * conviction * edge * 0.012
+    shock = random.uniform(*BLACK_SWAN_IMPACT) if black_swan else 0
 
+    pnl = agent["equity"] * conviction * (edge + shock) * 0.01
     agent["equity"] += pnl
-    agent["last_return"] = pnl / max(agent["equity"], 1)
+
+    if pnl < 0:
+        agent["memory"][w][r] += abs(pnl) / max(agent["equity"], 1)
+    else:
+        agent["memory"][w][r] *= MEMORY_DECAY
+
+    agent["score"] += pnl
 
     if agent["equity"] > agent["peak"]:
         agent["peak"] = agent["equity"]
 
-    # Memory (trauma)
-    if pnl < 0:
-        agent["memory"][w][r] += abs(agent["last_return"])
-    else:
-        agent["memory"][w][r] *= MEMORY_DECAY
-
-    agent["score"] += agent["last_return"]
-
     if agent["equity"] < BASE_CAPITAL * EXTINCTION_THRESHOLD:
         agent["alive"] = False
-        WORLD["extinct_dna"] += 1
-
-# -------------------------
-# CAPITAL ALLOCATOR
-# -------------------------
-def allocate_capital():
-    alive = [a for a in WORLD["agents"] if a["alive"]]
-    if not alive:
-        return
-
-    total_fitness = sum(max(fitness(a), 1) for a in alive)
-    pool = BASE_CAPITAL * len(alive)
-
-    for a in alive:
-        share = max(fitness(a), 1) / total_fitness
-        a["allocation"] = pool * share
-        a["equity"] = a["allocation"]
-        a["peak"] = a["allocation"]
+        WORLD["dynasties"][agent["species"]]["alive"] -= 1
 
 # -------------------------
 # EVOLUTION
 # -------------------------
 def evolution_step():
     alive = [a for a in WORLD["agents"] if a["alive"]]
-    if len(alive) <= 3:
+    if len(alive) <= 4:
         champion = max(WORLD["agents"], key=fitness)
+        WORLD["dynasties"][champion["species"]]["champions"] += 1
         WORLD["generation"] += 1
-        reset_population(seed_dna=champion["dna"])
+        reset_population(champion)
 
 # -------------------------
 # API
@@ -183,10 +184,11 @@ def evolution_step():
 def simulate_market(market: Dict):
     WORLD["step"] += 1
 
-    for agent in WORLD["agents"]:
-        simulate_agent(agent, market)
+    black_swan = random.random() < BLACK_SWAN_PROB
 
-    allocate_capital()
+    for agent in WORLD["agents"]:
+        simulate_agent(agent, market, black_swan)
+
     evolution_step()
 
     champion = max(WORLD["agents"], key=fitness)
@@ -194,30 +196,30 @@ def simulate_market(market: Dict):
     return {
         "step": WORLD["step"],
         "generation": WORLD["generation"],
-        "world": market.get("world"),
-        "regime": market.get("trend"),
+        "black_swan": black_swan,
         "champion": champion["id"],
-        "extinct_dna": WORLD["extinct_dna"],
+        "species": champion["species"],
+        "dynasties": WORLD["dynasties"],
         "agents": WORLD["agents"]
     }
 
 @app.get("/")
 def root():
     return {
-        "status": "ClawBot Phase 24 running",
+        "status": "ClawBot Phase 25 running",
         "generation": WORLD["generation"],
-        "step": WORLD["step"],
-        "extinct_dna": WORLD["extinct_dna"]
+        "species": len(WORLD["dynasties"])
     }
 
 @app.get("/dashboard")
 def dashboard():
     return {
         "generation": WORLD["generation"],
+        "dynasties": WORLD["dynasties"],
         "agents": sorted(WORLD["agents"], key=fitness, reverse=True)
     }
 
 # -------------------------
 # INIT
 # -------------------------
-reset_population()
+WORLD["agents"] = [spawn_agent() for _ in range(POPULATION_SIZE)]
