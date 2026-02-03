@@ -2,16 +2,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from typing import Dict, List
-import random
-import uuid
-import copy
-import time
+import random, uuid, copy, time, threading
 
 # ==================================================
 # APP
 # ==================================================
 
-app = FastAPI(title="ClawBot Phase 19 – Adaptive Evolution")
+app = FastAPI(title="ClawBot Phase 20 – AutoRun Regime Shift")
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,45 +22,51 @@ app.add_middleware(
 # UTIL
 # ==================================================
 
-def uid():
-    return str(uuid.uuid4())[:8]
-
-def now():
-    return int(time.time())
-
-def clamp(v, lo, hi):
-    return max(lo, min(v, hi))
+def uid(): return str(uuid.uuid4())[:8]
+def now(): return int(time.time())
+def clamp(v, lo, hi): return max(lo, min(v, hi))
 
 # ==================================================
-# MARKET
+# MARKET (Regime Engine)
 # ==================================================
 
-def market_return(m):
+REGIMES = [
+    {"trend":"up","risk":"low","vol":"normal"},
+    {"trend":"down","risk":"high","vol":"normal"},
+    {"trend":"side","risk":"medium","vol":"low"},
+    {"trend":"up","risk":"medium","vol":"extreme"},
+    {"trend":"down","risk":"high","vol":"extreme"},
+]
+
+CURRENT_REGIME = random.choice(REGIMES)
+LAST_SHIFT = now()
+SHIFT_INTERVAL = 20  # seconds
+
+def maybe_shift_regime():
+    global CURRENT_REGIME, LAST_SHIFT
+    if now() - LAST_SHIFT > SHIFT_INTERVAL:
+        CURRENT_REGIME = random.choice(REGIMES)
+        LAST_SHIFT = now()
+
+def market_return():
     r = 0
-    if m["trend"] == "up":
-        r += 0.02
-    if m["trend"] == "down":
-        r -= 0.02
-    if m["risk_level"] == "high":
-        r -= 0.01
-    if m["volatility"] == "extreme":
-        r += random.uniform(-0.05, 0.05)
+    if CURRENT_REGIME["trend"] == "up": r += 0.02
+    if CURRENT_REGIME["trend"] == "down": r -= 0.02
+    if CURRENT_REGIME["vol"] == "extreme": r += random.uniform(-0.06,0.06)
+    if CURRENT_REGIME["risk"] == "high": r -= 0.01
     return r
 
 # ==================================================
 # AGENTS
 # ==================================================
 
-def new_agent(name):
-    return {"id": uid(), "name": name, "alive": True}
+def new_agent(name): return {"id":uid(),"name":name}
 
-def agent_signal(agent, market, stance):
-    if stance == "DEFENSIVE" and market["risk_level"] == "high":
-        return "SELL"
-    if stance == "AGGRESSIVE" and market["trend"] == "up":
-        return "BUY"
-    if stance == "VOLATILITY" and market["volatility"] == "extreme":
-        return random.choice(["BUY", "SELL"])
+def agent_signal(market, stance):
+    if stance=="DEFENSIVE" and market["risk"]=="high": return "SELL"
+    if stance=="AGGRESSIVE" and market["trend"]=="up": return "BUY"
+    if stance=="VOLATILITY" and market["vol"]=="extreme":
+        return random.choice(["BUY","SELL"])
     return "HOLD"
 
 # ==================================================
@@ -72,121 +75,98 @@ def agent_signal(agent, market, stance):
 
 def new_world(seed=100_000):
     return {
-        "id": uid(),
-        "generation": 1,
-        "alive": True,
-        "cash": seed,
-        "position": 0.0,
-        "equity": seed,
-        "peak": seed,
-        "stance": random.choice(["DEFENSIVE", "AGGRESSIVE", "VOLATILITY"]),
-        "risk_budget": round(random.uniform(0.1, 0.3), 2),
-        "max_dd": round(random.uniform(0.25, 0.45), 2),
-        "last_return": 0.0,
-        "council": [new_agent("CORE"), new_agent("RISK"), new_agent("EXEC")],
-        "history": [],
-        "is_champion": False
+        "id":uid(),
+        "gen":1,
+        "alive":True,
+        "cash":seed,
+        "pos":0.0,
+        "equity":seed,
+        "peak":seed,
+        "stance":random.choice(["DEFENSIVE","AGGRESSIVE","VOLATILITY"]),
+        "risk":round(random.uniform(0.1,0.3),2),
+        "max_dd":round(random.uniform(0.25,0.45),2),
+        "last_r":0.0,
+        "council":[new_agent("CORE"),new_agent("RISK"),new_agent("EXEC")],
+        "champ":False
     }
 
 WORLDS: List[Dict] = [new_world() for _ in range(3)]
-CHAMPION_HISTORY: List[Dict] = []
 CHAMPION_ID = None
 STEP = 0
 
 # ==================================================
-# TRADING
+# CORE LOGIC
 # ==================================================
 
-def trade(world, signal, market):
-    before = world["equity"]
-    r = market_return(market)
+def trade(w):
+    before = w["equity"]
+    r = market_return()
 
-    if signal == "BUY" and world["cash"] > 0:
-        size = world["cash"] * world["risk_budget"]
-        world["cash"] -= size
-        world["position"] += size
+    sigs = [agent_signal(CURRENT_REGIME, w["stance"]) for _ in w["council"]]
+    signal = max(set(sigs), key=sigs.count)
 
-    elif signal == "SELL" and world["position"] > 0:
-        size = world["position"] * world["risk_budget"]
-        world["position"] -= size
-        world["cash"] += size
+    if signal=="BUY" and w["cash"]>0:
+        size = w["cash"]*w["risk"]
+        w["cash"]-=size; w["pos"]+=size
+    elif signal=="SELL" and w["pos"]>0:
+        size = w["pos"]*w["risk"]
+        w["pos"]-=size; w["cash"]+=size
 
-    world["position"] *= (1 + r)
-    world["equity"] = world["cash"] + world["position"]
-    world["peak"] = max(world["peak"], world["equity"])
-    world["last_return"] = round((world["equity"] - before) / before, 4)
+    w["pos"]*=(1+r)
+    w["equity"]=w["cash"]+w["pos"]
+    w["peak"]=max(w["peak"],w["equity"])
+    w["last_r"]=round((w["equity"]-before)/before,4)
 
-def check_death(world):
-    dd = 1 - (world["equity"] / world["peak"])
-    if dd > world["max_dd"]:
-        world["alive"] = False
+def check_death(w):
+    dd = 1-(w["equity"]/w["peak"])
+    if dd>w["max_dd"]: w["alive"]=False
 
-# ==================================================
-# EVOLUTION
-# ==================================================
+def fitness(w):
+    dd = 1-(w["equity"]/w["peak"])
+    return w["last_r"]-dd
 
-def fitness(world):
-    dd = 1 - (world["equity"] / world["peak"])
-    return world["last_return"] - dd
-
-def mutate(world):
-    w = copy.deepcopy(world)
-    w["id"] = uid()
-    w["generation"] += 1
-
-    # mutate risk & dd
-    w["risk_budget"] = clamp(
-        w["risk_budget"] + random.uniform(-0.05, 0.05), 0.05, 0.4
-    )
-    w["max_dd"] = clamp(
-        w["max_dd"] + random.uniform(-0.05, 0.05), 0.15, 0.6
-    )
-
-    # stance mutation
-    if random.random() < 0.2:
-        w["stance"] = random.choice(["DEFENSIVE", "AGGRESSIVE", "VOLATILITY"])
-
-    w["cash"] = w["equity"]
-    w["position"] = 0
-    w["peak"] = w["cash"]
-    w["history"] = []
-    w["is_champion"] = False
+def mutate(parent):
+    w = copy.deepcopy(parent)
+    w["id"]=uid(); w["gen"]+=1
+    w["risk"]=clamp(w["risk"]+random.uniform(-0.05,0.05),0.05,0.4)
+    w["max_dd"]=clamp(w["max_dd"]+random.uniform(-0.05,0.05),0.15,0.6)
+    if random.random()<0.2:
+        w["stance"]=random.choice(["DEFENSIVE","AGGRESSIVE","VOLATILITY"])
+    w["cash"]=w["equity"]; w["pos"]=0; w["peak"]=w["cash"]
+    w["alive"]=True; w["champ"]=False
     return w
 
-def select_champion():
-    global CHAMPION_ID
-    alive = [w for w in WORLDS if w["alive"]]
+def evolve():
+    global WORLDS, CHAMPION_ID
+    alive=[w for w in WORLDS if w["alive"]]
     if not alive:
-        CHAMPION_ID = None
-        return
-
-    best = max(alive, key=fitness)
-
-    if CHAMPION_ID != best["id"]:
-        CHAMPION_HISTORY.append({
-            "time": now(),
-            "champion": best["id"],
-            "equity": round(best["equity"], 2)
-        })
-
-    CHAMPION_ID = best["id"]
-    for w in WORLDS:
-        w["is_champion"] = (w["id"] == CHAMPION_ID)
-
-def reproduce():
-    global WORLDS
-    alive = [w for w in WORLDS if w["alive"]]
-
-    if not alive:
-        WORLDS = [new_world()]
-        return
-
+        WORLDS=[new_world()]; return
     alive.sort(key=fitness, reverse=True)
-
-    while len(alive) < 3:
+    champ=alive[0]["id"]
+    for w in alive: w["champ"]=(w["id"]==champ)
+    CHAMPION_ID=champ
+    while len(alive)<3:
         alive.append(mutate(alive[0]))
+    WORLDS=alive
 
-    WORLDS = alive
+# ==================================================
+# AUTO RUN LOOP
+# ==================================================
+
+AUTO_INTERVAL = 3  # seconds
+
+def auto_loop():
+    global STEP
+    while True:
+        time.sleep(AUTO_INTERVAL)
+        STEP+=1
+        maybe_shift_regime()
+        for w in WORLDS:
+            if not w["alive"]: continue
+            trade(w); check_death(w)
+        evolve()
+
+threading.Thread(target=auto_loop, daemon=True).start()
 
 # ==================================================
 # API
@@ -194,88 +174,37 @@ def reproduce():
 
 @app.get("/")
 def root():
-    return {"status": "ClawBot Phase 19 – Running"}
-
-@app.post("/simulate/market")
-def simulate_market(
-    risk_level: str = "high",
-    trend: str = "down",
-    volatility: str = "extreme",
-    liquidity: str = "tight"
-):
-    global STEP
-    STEP += 1
-
-    market = {
-        "risk_level": risk_level,
-        "trend": trend,
-        "volatility": volatility,
-        "liquidity": liquidity
-    }
-
-    select_champion()
-
-    for w in WORLDS:
-        if not w["alive"]:
-            continue
-        signals = [agent_signal(a, market, w["stance"]) for a in w["council"]]
-        final_signal = max(set(signals), key=signals.count)
-        trade(w, final_signal, market)
-        check_death(w)
-        w["history"].append(w["equity"])
-
-    reproduce()
-    select_champion()
-
-    return {
-        "step": STEP,
-        "market": market,
-        "champion": CHAMPION_ID,
-        "worlds": WORLDS
-    }
-
-# ==================================================
-# DASHBOARD
-# ==================================================
+    return {"status":"ClawBot Phase 20 running","step":STEP,"regime":CURRENT_REGIME}
 
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard():
-    rows = ""
+    rows=""
     for w in WORLDS:
-        rows += f"""
+        rows+=f"""
         <tr>
-            <td>{w['id']}</td>
-            <td>{w['stance']}</td>
-            <td>{w['generation']}</td>
-            <td>{round(w['equity'],2)}</td>
-            <td>{w['last_return']}</td>
-            <td>{"🏆" if w['is_champion'] else ""}</td>
+            <td>{w['id']}</td><td>{w['stance']}</td><td>{w['gen']}</td>
+            <td>{round(w['equity'],2)}</td><td>{w['last_r']}</td>
+            <td>{"🏆" if w['champ'] else ""}</td>
         </tr>
         """
-
-    html = f"""
+    return f"""
     <html>
     <head>
-        <title>ClawBot Dashboard</title>
         <meta http-equiv="refresh" content="5">
         <style>
-            body {{ font-family: Arial; background:#0e1117; color:#e6e6e6 }}
-            table {{ border-collapse: collapse; width:100% }}
-            th, td {{ border:1px solid #333; padding:8px; text-align:center }}
-            th {{ background:#1f2933 }}
+            body{{background:#0e1117;color:#e6e6e6;font-family:Arial}}
+            table{{width:100%;border-collapse:collapse}}
+            th,td{{border:1px solid #333;padding:8px;text-align:center}}
+            th{{background:#1f2933}}
         </style>
     </head>
     <body>
-        <h1>🧬 ClawBot Phase 19 – Adaptive Evolution</h1>
+        <h1>🧬 ClawBot Phase 20 – Auto Evolution</h1>
+        <p>Regime: {CURRENT_REGIME}</p>
         <table>
-            <tr>
-                <th>ID</th><th>Stance</th><th>Gen</th>
-                <th>Equity</th><th>Last R</th><th>🏆</th>
-            </tr>
+            <tr><th>ID</th><th>Stance</th><th>Gen</th><th>Equity</th><th>Last R</th><th>🏆</th></tr>
             {rows}
         </table>
-        <p>Auto refresh every 5s</p>
     </body>
     </html>
     """
-    return html
