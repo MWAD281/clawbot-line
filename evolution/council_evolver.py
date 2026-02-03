@@ -11,18 +11,18 @@ def evolve_from_council(ai_text: str) -> dict:
         return get_judgment()
 
     total_weight = sum(o["weight"] for o in opinions)
-    avg_score = sum(o["score"] * o["weight"] for o in opinions) / total_weight
+    avg_score = sum(o["market_score"] * o["weight"] for o in opinions) / total_weight
     avg_risk = sum(o["global_risk"] * o["weight"] for o in opinions) / total_weight
 
     judgment = get_judgment()
     judgment.setdefault("confidence", 0.5)
 
-    if avg_score < -0.4 or avg_risk > 0.7:
+    if avg_score < -0.3 or avg_risk > 0.65:
         judgment["worldview"] = "defensive"
         judgment["stance"] = "RISK_OFF"
         judgment["confidence"] = max(0.1, judgment["confidence"] - 0.1)
 
-    elif avg_score > 0.4 and avg_risk < 0.4:
+    elif avg_score > 0.3 and avg_risk < 0.45:
         judgment["worldview"] = "aggressive"
         judgment["stance"] = "RISK_ON"
         judgment["confidence"] = min(0.9, judgment["confidence"] + 0.1)
@@ -33,7 +33,7 @@ def evolve_from_council(ai_text: str) -> dict:
 
     overwrite_judgment(judgment)
 
-    # 🔥 Darwinism
+    # 🧬 Darwinism จากตลาด
     adjust_ceo_fitness(opinions)
 
     return judgment
