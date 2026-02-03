@@ -1,15 +1,18 @@
 from fastapi import FastAPI
-from routers.health import router as health_router
-from world.ceos.market_probe import get_market_snapshot
+
+# ✅ import ให้ตรงตำแหน่งจริง
+from world.market_probe import get_market_snapshot
 
 app = FastAPI(title="ClawBot")
-
-app.include_router(health_router)
 
 @app.get("/")
 def root():
     return {
         "service": "clawbot-line",
-        "phase": 96,
-        "market_snapshot": get_market_snapshot()
+        "status": "ok",
+        "market": get_market_snapshot()
     }
+
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
