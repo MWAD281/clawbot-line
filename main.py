@@ -1,28 +1,32 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 import random
 import time
 import copy
 
 app = FastAPI(
-    title="ClawBot Phase 90 – CEO Council",
-    version="90.0.0",
-    description="Multi-CEO voting, capital allocation, risk guard"
+    title="ClawBot Phase 90 – CEO Council (Hardened)",
+    version="90.1.0",
+    description="Multi-CEO voting, Darwinism, capital, global risk guard"
 )
 
 # =========================
-# GLOBAL STATE
+# GLOBAL CONFIG
 # =========================
 
 GENERATION = 90
-AGENTS: Dict[int, Dict] = {}
+
 MAX_AGENTS = 5
 MIN_FITNESS = 0.55
 MUTATION_RATE = 0.12
 
-TOTAL_CAPITAL = 100_000
+INITIAL_CAPITAL = 100_000.0
+TOTAL_CAPITAL = INITIAL_CAPITAL
+GLOBAL_MAX_DRAWDOWN = -0.30     # -30% system stop
 MAX_RISK_PER_TRADE = 0.15
+
+AGENTS: Dict[int, Dict] = {}
 
 # =========================
 # MODELS
@@ -39,7 +43,9 @@ class DecisionResult(BaseModel):
     agent_id: int
     agent_decision: str
     council_decision: str
-    capital_allocated: float
+    confidence: float
+    pnl: float
+    capital_after: float
     fitness: float
     genome: Dict
     votes: Dict
@@ -63,6 +69,7 @@ def spawn_agent(agent_id: int):
     AGENTS[agent_id] = {
         "genome": create_genome(),
         "fitness": round(random.uniform(0.6, 0.8), 3),
+        "capital": TOTAL_CAPITAL / MAX_AGENTS,
         "alive": True,
         "history": []
     }
@@ -80,7 +87,7 @@ def ceo_optimist(decision, confidence):
 
 
 def ceo_pessimist(decision, confidence):
-    return "HOLD" if confidence < 0.75 else decision
+    return decision if confidence > 0.75 else "HOLD"
 
 
 def ceo_realist(decision, confidence):
@@ -88,10 +95,8 @@ def ceo_realist(decision, confidence):
 
 
 def ceo_strategist(decision, confidence):
-    if decision == "BUY" and confidence > 0.65:
-        return "BUY"
-    if decision == "SELL" and confidence > 0.65:
-        return "SELL"
+    if decision in ("BUY", "SELL") and confidence > 0.65:
+        return decision
     return "HOLD"
 
 
@@ -103,27 +108,13 @@ CEO_COUNCIL = {
 }
 
 # =========================
-# ROOT / HEALTH
+# UTILS
 # =========================
 
-@app.get("/")
-def root():
-    return {
-        "status": "ClawBot online",
-        "phase": 90,
-        "agents_alive": sum(1 for a in AGENTS.values() if a["alive"]),
-        "ceo_council": list(CEO_COUNCIL.keys())
-    }
+def global_drawdown():
+    current = sum(a["capital"] for a in AGENTS.values())
+    return (current - INITIAL_CAPITAL) / INITIAL_CAPITAL
 
-
-@app.get("/health")
-def health():
-    return {"ok": True}
-
-
-# =========================
-# CORE LOGIC
-# =========================
 
 def agent_decide(genome):
     roll = random.random()
@@ -134,14 +125,21 @@ def agent_decide(genome):
     return "HOLD"
 
 
-def update_fitness(agent, confidence):
-    delta = (confidence - 0.5) * random.uniform(0.8, 1.2)
+def simulate_pnl(decision, confidence):
+    if decision == "HOLD":
+        return 0.0
+    base = random.uniform(-0.04, 0.05)
+    return round(base * confidence, 4)
+
+
+def update_fitness(agent, pnl):
+    delta = pnl * random.uniform(0.8, 1.2)
     agent["fitness"] = round(
-        max(0.0, min(1.0, agent["fitness"] + delta * 0.1)),
+        max(0.0, min(1.0, agent["fitness"] + delta)),
         3
     )
     agent["history"].append(agent["fitness"])
-    if len(agent["history"]) > 25:
+    if len(agent["history"]) > 30:
         agent["history"].pop(0)
 
 
@@ -152,23 +150,54 @@ def maybe_mutate(genome):
             max(0.1, min(0.9, genome[k] + random.uniform(-0.15, 0.15))),
             2
         )
-        return f"mutation on {k}"
+        return f"mutation:{k}"
     return None
 
 
-def capital_allocation(decision, confidence):
-    if decision == "HOLD":
-        return 0.0
-    risk_factor = min(confidence, MAX_RISK_PER_TRADE)
-    return round(TOTAL_CAPITAL * risk_factor, 2)
+# =========================
+# ROOT / HEALTH
+# =========================
+
+@app.get("/")
+def root():
+    return {
+        "status": "ClawBot online",
+        "phase": 90,
+        "agents_alive": sum(1 for a in AGENTS.values() if a["alive"]),
+        "global_drawdown": round(global_drawdown(), 3),
+        "ceo_council": list(CEO_COUNCIL.keys())
+    }
+
+
+@app.get("/health")
+def health():
+    return {"ok": True, "phase": 90}
 
 
 # =========================
-# SIMULATION ENDPOINT
+# SIMULATION
 # =========================
 
 @app.post("/simulate/market", response_model=DecisionResult)
 def simulate_market(input: MarketInput):
+
+    # GLOBAL KILL SWITCH
+    if global_drawdown() <= GLOBAL_MAX_DRAWDOWN:
+        return DecisionResult(
+            generation=GENERATION,
+            agent_id=-1,
+            agent_decision="HALT",
+            council_decision="HALT",
+            confidence=0.0,
+            pnl=0.0,
+            capital_after=round(sum(a["capital"] for a in AGENTS.values()), 2),
+            fitness=0.0,
+            genome={},
+            votes={},
+            note="GLOBAL KILL SWITCH ACTIVATED",
+            timestamp=time.time()
+        )
+
     alive_agents = [i for i, a in AGENTS.items() if a["alive"]]
     agent_id = random.choice(alive_agents)
     agent = AGENTS[agent_id]
@@ -178,9 +207,16 @@ def simulate_market(input: MarketInput):
     decision = agent_decide(genome)
     confidence = round(random.uniform(0.5, 0.95), 2)
 
-    update_fitness(agent, confidence)
+    # CEO COUNCIL
+    votes = {name: ceo(decision, confidence) for name, ceo in CEO_COUNCIL.items()}
+    final_decision = max(set(votes.values()), key=lambda d: list(votes.values()).count(d))
 
-    # Death & Rebirth
+    pnl_pct = simulate_pnl(final_decision, confidence)
+    pnl_value = agent["capital"] * pnl_pct
+    agent["capital"] += pnl_value
+
+    update_fitness(agent, pnl_pct)
+
     note = "stable"
     if agent["fitness"] < MIN_FITNESS:
         agent["alive"] = False
@@ -191,27 +227,14 @@ def simulate_market(input: MarketInput):
     if mutation_note:
         note += f" | {mutation_note}"
 
-    # =========================
-    # CEO COUNCIL VOTE
-    # =========================
-
-    votes = {}
-    for name, ceo in CEO_COUNCIL.items():
-        votes[name] = ceo(decision, confidence)
-
-    final_decision = max(
-        set(votes.values()),
-        key=lambda d: list(votes.values()).count(d)
-    )
-
-    capital = capital_allocation(final_decision, confidence)
-
     return DecisionResult(
         generation=GENERATION,
         agent_id=agent_id,
         agent_decision=decision,
         council_decision=final_decision,
-        capital_allocated=capital,
+        confidence=confidence,
+        pnl=round(pnl_value, 2),
+        capital_after=round(agent["capital"], 2),
         fitness=agent["fitness"],
         genome=copy.deepcopy(genome),
         votes=votes,
@@ -221,7 +244,7 @@ def simulate_market(input: MarketInput):
 
 
 # =========================
-# DASHBOARD / DEBUG
+# DEBUG / CONTROL
 # =========================
 
 @app.get("/agents")
@@ -229,14 +252,9 @@ def agents():
     return AGENTS
 
 
-@app.get("/council")
-def council():
-    return list(CEO_COUNCIL.keys())
-
-
 @app.post("/reset")
 def reset():
     AGENTS.clear()
     for i in range(1, MAX_AGENTS + 1):
         spawn_agent(i)
-    return {"reset": True}
+    return {"reset": True, "phase": 90}
