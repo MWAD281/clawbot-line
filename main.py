@@ -1,3 +1,7 @@
+# main.py
+# Phase 96 Simulation Runner
+# ⚠️ ไฟล์นี้ไม่ใช่ Web API
+
 import random
 import time
 
