@@ -1,11 +1,22 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime
 
 app = FastAPI(
     title="ClawBot Phase 35 – LINE Bridge",
     version="0.1.0"
+)
+
+# =========================
+# CORS (สำคัญมาก)
+# =========================
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],          # production จริงค่อย lock domain
+    allow_credentials=True,
+    allow_methods=["*"],          # GET POST OPTIONS
+    allow_headers=["*"],
 )
 
 # =========================
@@ -23,7 +34,7 @@ def root():
     }
 
 # =========================
-# LINE Webhook (placeholder)
+# LINE Webhook
 # =========================
 @app.post("/line/webhook")
 async def line_webhook(request: Request):
@@ -57,7 +68,7 @@ def simulate_market(data: MarketInput):
     }
 
 # =========================
-# Dashboard (JSON version)
+# Dashboard
 # =========================
 @app.get("/dashboard")
 def dashboard():
