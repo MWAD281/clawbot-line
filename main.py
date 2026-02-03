@@ -1,15 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
-from typing import Dict, List
-import random, uuid, copy, time, threading
+from typing import List, Dict
+import random
+import uuid
+import time
 
-# ==================================================
-# APP
-# ==================================================
+app = FastAPI(title="ClawBot Phase 21 – Hardcore Darwinism")
 
-app = FastAPI(title="ClawBot Phase 20 – AutoRun Regime Shift")
-
+# -------------------------
+# CORS (จำเป็นบน Render)
+# -------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,193 +18,174 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ==================================================
-# UTIL
-# ==================================================
+# -------------------------
+# CONFIG
+# -------------------------
+POPULATION_SIZE = 6
+INITIAL_CASH = 100_000
+KILL_THRESHOLD = 0.6  # equity < 60% = ตาย
+MUTATION_RATE = 0.25
 
-def uid(): return str(uuid.uuid4())[:8]
-def now(): return int(time.time())
-def clamp(v, lo, hi): return max(lo, min(v, hi))
-
-# ==================================================
-# MARKET (Regime Engine)
-# ==================================================
-
-REGIMES = [
-    {"trend":"up","risk":"low","vol":"normal"},
-    {"trend":"down","risk":"high","vol":"normal"},
-    {"trend":"side","risk":"medium","vol":"low"},
-    {"trend":"up","risk":"medium","vol":"extreme"},
-    {"trend":"down","risk":"high","vol":"extreme"},
-]
-
-CURRENT_REGIME = random.choice(REGIMES)
-LAST_SHIFT = now()
-SHIFT_INTERVAL = 20  # seconds
-
-def maybe_shift_regime():
-    global CURRENT_REGIME, LAST_SHIFT
-    if now() - LAST_SHIFT > SHIFT_INTERVAL:
-        CURRENT_REGIME = random.choice(REGIMES)
-        LAST_SHIFT = now()
-
-def market_return():
-    r = 0
-    if CURRENT_REGIME["trend"] == "up": r += 0.02
-    if CURRENT_REGIME["trend"] == "down": r -= 0.02
-    if CURRENT_REGIME["vol"] == "extreme": r += random.uniform(-0.06,0.06)
-    if CURRENT_REGIME["risk"] == "high": r -= 0.01
-    return r
-
-# ==================================================
-# AGENTS
-# ==================================================
-
-def new_agent(name): return {"id":uid(),"name":name}
-
-def agent_signal(market, stance):
-    if stance=="DEFENSIVE" and market["risk"]=="high": return "SELL"
-    if stance=="AGGRESSIVE" and market["trend"]=="up": return "BUY"
-    if stance=="VOLATILITY" and market["vol"]=="extreme":
-        return random.choice(["BUY","SELL"])
-    return "HOLD"
-
-# ==================================================
-# WORLD
-# ==================================================
-
-def new_world(seed=100_000):
+# -------------------------
+# DNA / AGENT
+# -------------------------
+def random_dna():
     return {
-        "id":uid(),
-        "gen":1,
-        "alive":True,
-        "cash":seed,
-        "pos":0.0,
-        "equity":seed,
-        "peak":seed,
-        "stance":random.choice(["DEFENSIVE","AGGRESSIVE","VOLATILITY"]),
-        "risk":round(random.uniform(0.1,0.3),2),
-        "max_dd":round(random.uniform(0.25,0.45),2),
-        "last_r":0.0,
-        "council":[new_agent("CORE"),new_agent("RISK"),new_agent("EXEC")],
-        "champ":False
+        "risk_per_trade": round(random.uniform(0.01, 0.05), 3),
+        "leverage": round(random.uniform(1.0, 3.0), 2),
+        "aggression": round(random.uniform(0.2, 0.9), 2),
+        "volatility_bias": random.choice(["low", "mid", "high"])
     }
 
-WORLDS: List[Dict] = [new_world() for _ in range(3)]
-CHAMPION_ID = None
-STEP = 0
+def mutate_dna(dna):
+    new = dna.copy()
+    if random.random() < MUTATION_RATE:
+        new["risk_per_trade"] = round(
+            max(0.005, min(0.08, dna["risk_per_trade"] + random.uniform(-0.01, 0.01))), 3
+        )
+    if random.random() < MUTATION_RATE:
+        new["leverage"] = round(
+            max(1.0, min(5.0, dna["leverage"] + random.uniform(-0.5, 0.5))), 2
+        )
+    if random.random() < MUTATION_RATE:
+        new["aggression"] = round(
+            max(0.1, min(1.0, dna["aggression"] + random.uniform(-0.1, 0.1))), 2
+        )
+    return new
 
-# ==================================================
-# CORE LOGIC
-# ==================================================
+# -------------------------
+# WORLD STATE
+# -------------------------
+WORLD: Dict = {
+    "step": 0,
+    "generation": 1,
+    "market": {},
+    "agents": []
+}
 
-def trade(w):
-    before = w["equity"]
-    r = market_return()
+def spawn_agent(dna=None):
+    return {
+        "id": uuid.uuid4().hex[:8],
+        "generation": WORLD["generation"],
+        "alive": True,
+        "cash": INITIAL_CASH,
+        "equity": INITIAL_CASH,
+        "peak": INITIAL_CASH,
+        "last_return": 0.0,
+        "dna": dna or random_dna()
+    }
 
-    sigs = [agent_signal(CURRENT_REGIME, w["stance"]) for _ in w["council"]]
-    signal = max(set(sigs), key=sigs.count)
+def reset_population(seed_dna=None):
+    WORLD["agents"] = []
+    for _ in range(POPULATION_SIZE):
+        if seed_dna:
+            WORLD["agents"].append(spawn_agent(mutate_dna(seed_dna)))
+        else:
+            WORLD["agents"].append(spawn_agent())
 
-    if signal=="BUY" and w["cash"]>0:
-        size = w["cash"]*w["risk"]
-        w["cash"]-=size; w["pos"]+=size
-    elif signal=="SELL" and w["pos"]>0:
-        size = w["pos"]*w["risk"]
-        w["pos"]-=size; w["cash"]+=size
+# -------------------------
+# FITNESS
+# -------------------------
+def fitness(agent):
+    dd = (agent["peak"] - agent["equity"]) / agent["peak"]
+    return agent["equity"] * (1 - dd)
 
-    w["pos"]*=(1+r)
-    w["equity"]=w["cash"]+w["pos"]
-    w["peak"]=max(w["peak"],w["equity"])
-    w["last_r"]=round((w["equity"]-before)/before,4)
+# -------------------------
+# SIMULATION CORE
+# -------------------------
+def simulate_agent(agent, market):
+    if not agent["alive"]:
+        return
 
-def check_death(w):
-    dd = 1-(w["equity"]/w["peak"])
-    if dd>w["max_dd"]: w["alive"]=False
+    dna = agent["dna"]
 
-def fitness(w):
-    dd = 1-(w["equity"]/w["peak"])
-    return w["last_r"]-dd
+    volatility_factor = {
+        "low": 0.5,
+        "mid": 1.0,
+        "high": 1.5
+    }[dna["volatility_bias"]]
 
-def mutate(parent):
-    w = copy.deepcopy(parent)
-    w["id"]=uid(); w["gen"]+=1
-    w["risk"]=clamp(w["risk"]+random.uniform(-0.05,0.05),0.05,0.4)
-    w["max_dd"]=clamp(w["max_dd"]+random.uniform(-0.05,0.05),0.15,0.6)
-    if random.random()<0.2:
-        w["stance"]=random.choice(["DEFENSIVE","AGGRESSIVE","VOLATILITY"])
-    w["cash"]=w["equity"]; w["pos"]=0; w["peak"]=w["cash"]
-    w["alive"]=True; w["champ"]=False
-    return w
+    market_vol = {
+        "normal": 0.5,
+        "high": 1.0,
+        "extreme": 2.0
+    }.get(market["volatility"], 1.0)
 
-def evolve():
-    global WORLDS, CHAMPION_ID
-    alive=[w for w in WORLDS if w["alive"]]
-    if not alive:
-        WORLDS=[new_world()]; return
-    alive.sort(key=fitness, reverse=True)
-    champ=alive[0]["id"]
-    for w in alive: w["champ"]=(w["id"]==champ)
-    CHAMPION_ID=champ
-    while len(alive)<3:
-        alive.append(mutate(alive[0]))
-    WORLDS=alive
+    edge = random.uniform(-1, 1)
+    pnl = (
+        agent["equity"]
+        * dna["risk_per_trade"]
+        * dna["leverage"]
+        * dna["aggression"]
+        * volatility_factor
+        * market_vol
+        * edge
+    )
 
-# ==================================================
-# AUTO RUN LOOP
-# ==================================================
+    agent["equity"] += pnl
+    agent["last_return"] = pnl / max(agent["equity"], 1)
 
-AUTO_INTERVAL = 3  # seconds
+    if agent["equity"] > agent["peak"]:
+        agent["peak"] = agent["equity"]
 
-def auto_loop():
-    global STEP
-    while True:
-        time.sleep(AUTO_INTERVAL)
-        STEP+=1
-        maybe_shift_regime()
-        for w in WORLDS:
-            if not w["alive"]: continue
-            trade(w); check_death(w)
-        evolve()
+    if agent["equity"] < INITIAL_CASH * KILL_THRESHOLD:
+        agent["alive"] = False
 
-threading.Thread(target=auto_loop, daemon=True).start()
+# -------------------------
+# EVOLUTION STEP
+# -------------------------
+def evolution_step():
+    alive = [a for a in WORLD["agents"] if a["alive"]]
 
-# ==================================================
+    if len(alive) <= 2:
+        champion = max(WORLD["agents"], key=fitness)
+        WORLD["generation"] += 1
+        reset_population(seed_dna=champion["dna"])
+
+# -------------------------
 # API
-# ==================================================
+# -------------------------
+@app.post("/simulate/market")
+def simulate_market(market: Dict):
+    WORLD["step"] += 1
+    WORLD["market"] = market
+
+    for agent in WORLD["agents"]:
+        simulate_agent(agent, market)
+
+    evolution_step()
+
+    champion = max(WORLD["agents"], key=fitness)
+
+    return {
+        "step": WORLD["step"],
+        "generation": WORLD["generation"],
+        "market": market,
+        "champion": champion["id"],
+        "agents": WORLD["agents"]
+    }
 
 @app.get("/")
 def root():
-    return {"status":"ClawBot Phase 20 running","step":STEP,"regime":CURRENT_REGIME}
+    return {
+        "status": "ClawBot Phase 21 running",
+        "step": WORLD["step"],
+        "generation": WORLD["generation"]
+    }
 
-@app.get("/dashboard", response_class=HTMLResponse)
+@app.get("/dashboard")
 def dashboard():
-    rows=""
-    for w in WORLDS:
-        rows+=f"""
-        <tr>
-            <td>{w['id']}</td><td>{w['stance']}</td><td>{w['gen']}</td>
-            <td>{round(w['equity'],2)}</td><td>{w['last_r']}</td>
-            <td>{"🏆" if w['champ'] else ""}</td>
-        </tr>
-        """
-    return f"""
-    <html>
-    <head>
-        <meta http-equiv="refresh" content="5">
-        <style>
-            body{{background:#0e1117;color:#e6e6e6;font-family:Arial}}
-            table{{width:100%;border-collapse:collapse}}
-            th,td{{border:1px solid #333;padding:8px;text-align:center}}
-            th{{background:#1f2933}}
-        </style>
-    </head>
-    <body>
-        <h1>🧬 ClawBot Phase 20 – Auto Evolution</h1>
-        <p>Regime: {CURRENT_REGIME}</p>
-        <table>
-            <tr><th>ID</th><th>Stance</th><th>Gen</th><th>Equity</th><th>Last R</th><th>🏆</th></tr>
-            {rows}
-        </table>
-    </body>
-    </html>
-    """
+    return {
+        "generation": WORLD["generation"],
+        "step": WORLD["step"],
+        "agents": sorted(
+            WORLD["agents"],
+            key=lambda a: a["equity"],
+            reverse=True
+        )
+    }
+
+# -------------------------
+# INIT
+# -------------------------
+reset_population()
