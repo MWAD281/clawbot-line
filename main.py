@@ -6,20 +6,23 @@ import time
 import copy
 
 app = FastAPI(
-    title="ClawBot Phase 80 – Darwin Core",
-    version="80.0.0",
-    description="Selection, death, rebirth, mutation, tournament"
+    title="ClawBot Phase 90 – CEO Council",
+    version="90.0.0",
+    description="Multi-CEO voting, capital allocation, risk guard"
 )
 
 # =========================
-# GLOBAL STATE (IN-MEMORY)
+# GLOBAL STATE
 # =========================
 
+GENERATION = 90
 AGENTS: Dict[int, Dict] = {}
-GENERATION = 80
 MAX_AGENTS = 5
 MIN_FITNESS = 0.55
-MUTATION_RATE = 0.15
+MUTATION_RATE = 0.12
+
+TOTAL_CAPITAL = 100_000
+MAX_RISK_PER_TRADE = 0.15
 
 # =========================
 # MODELS
@@ -31,19 +34,21 @@ class MarketInput(BaseModel):
     liquidity: Optional[str] = "normal"
 
 
-class SimulationResult(BaseModel):
+class DecisionResult(BaseModel):
     generation: int
     agent_id: int
-    decision: str
-    confidence: float
+    agent_decision: str
+    council_decision: str
+    capital_allocated: float
     fitness: float
     genome: Dict
+    votes: Dict
     note: str
     timestamp: float
 
 
 # =========================
-# INIT
+# AGENT CORE
 # =========================
 
 def create_genome():
@@ -58,13 +63,44 @@ def spawn_agent(agent_id: int):
     AGENTS[agent_id] = {
         "genome": create_genome(),
         "fitness": round(random.uniform(0.6, 0.8), 3),
-        "history": [],
-        "alive": True
+        "alive": True,
+        "history": []
     }
 
 
 for i in range(1, MAX_AGENTS + 1):
     spawn_agent(i)
+
+# =========================
+# CEO COUNCIL
+# =========================
+
+def ceo_optimist(decision, confidence):
+    return decision if confidence > 0.6 else "HOLD"
+
+
+def ceo_pessimist(decision, confidence):
+    return "HOLD" if confidence < 0.75 else decision
+
+
+def ceo_realist(decision, confidence):
+    return decision if 0.55 <= confidence <= 0.8 else "HOLD"
+
+
+def ceo_strategist(decision, confidence):
+    if decision == "BUY" and confidence > 0.65:
+        return "BUY"
+    if decision == "SELL" and confidence > 0.65:
+        return "SELL"
+    return "HOLD"
+
+
+CEO_COUNCIL = {
+    "optimist": ceo_optimist,
+    "pessimist": ceo_pessimist,
+    "realist": ceo_realist,
+    "strategist": ceo_strategist,
+}
 
 # =========================
 # ROOT / HEALTH
@@ -74,9 +110,9 @@ for i in range(1, MAX_AGENTS + 1):
 def root():
     return {
         "status": "ClawBot online",
-        "phase": 80,
+        "phase": 90,
         "agents_alive": sum(1 for a in AGENTS.values() if a["alive"]),
-        "darwinism": True
+        "ceo_council": list(CEO_COUNCIL.keys())
     }
 
 
@@ -86,10 +122,52 @@ def health():
 
 
 # =========================
-# CORE SIMULATION
+# CORE LOGIC
 # =========================
 
-@app.post("/simulate/market", response_model=SimulationResult)
+def agent_decide(genome):
+    roll = random.random()
+    if roll < genome["aggression"]:
+        return "BUY"
+    elif roll > 1 - genome["risk"]:
+        return "SELL"
+    return "HOLD"
+
+
+def update_fitness(agent, confidence):
+    delta = (confidence - 0.5) * random.uniform(0.8, 1.2)
+    agent["fitness"] = round(
+        max(0.0, min(1.0, agent["fitness"] + delta * 0.1)),
+        3
+    )
+    agent["history"].append(agent["fitness"])
+    if len(agent["history"]) > 25:
+        agent["history"].pop(0)
+
+
+def maybe_mutate(genome):
+    if random.random() < MUTATION_RATE:
+        k = random.choice(list(genome.keys()))
+        genome[k] = round(
+            max(0.1, min(0.9, genome[k] + random.uniform(-0.15, 0.15))),
+            2
+        )
+        return f"mutation on {k}"
+    return None
+
+
+def capital_allocation(decision, confidence):
+    if decision == "HOLD":
+        return 0.0
+    risk_factor = min(confidence, MAX_RISK_PER_TRADE)
+    return round(TOTAL_CAPITAL * risk_factor, 2)
+
+
+# =========================
+# SIMULATION ENDPOINT
+# =========================
+
+@app.post("/simulate/market", response_model=DecisionResult)
 def simulate_market(input: MarketInput):
     alive_agents = [i for i, a in AGENTS.items() if a["alive"]]
     agent_id = random.choice(alive_agents)
@@ -97,99 +175,63 @@ def simulate_market(input: MarketInput):
 
     genome = agent["genome"]
 
-    # Decision logic (genome-influenced)
-    roll = random.random()
-    if roll < genome["aggression"]:
-        decision = "BUY"
-    elif roll > 1 - genome["risk"]:
-        decision = "SELL"
-    else:
-        decision = "HOLD"
-
+    decision = agent_decide(genome)
     confidence = round(random.uniform(0.5, 0.95), 2)
 
-    # Fitness update
-    delta = (confidence - 0.5) * random.uniform(0.8, 1.2)
-    agent["fitness"] = round(
-        max(0.0, min(1.0, agent["fitness"] + delta * 0.1)),
-        3
-    )
+    update_fitness(agent, confidence)
 
-    agent["history"].append(agent["fitness"])
-    if len(agent["history"]) > 30:
-        agent["history"].pop(0)
-
-    note = "Stable"
-
-    # =========================
-    # Phase 77–78: Selection & Death
-    # =========================
-
+    # Death & Rebirth
+    note = "stable"
     if agent["fitness"] < MIN_FITNESS:
         agent["alive"] = False
-        note = "Agent died (low fitness)"
+        spawn_agent(agent_id)
+        note = "agent died → reborn"
 
-        # Rebirth
-        dead_id = agent_id
-        spawn_agent(dead_id)
-        note += " → reborn with new genome"
+    mutation_note = maybe_mutate(genome)
+    if mutation_note:
+        note += f" | {mutation_note}"
 
     # =========================
-    # Phase 79: Mutation
+    # CEO COUNCIL VOTE
     # =========================
 
-    if random.random() < MUTATION_RATE:
-        trait = random.choice(list(genome.keys()))
-        genome[trait] = round(
-            max(0.1, min(0.9, genome[trait] + random.uniform(-0.15, 0.15))),
-            2
-        )
-        note += f" | mutation on {trait}"
+    votes = {}
+    for name, ceo in CEO_COUNCIL.items():
+        votes[name] = ceo(decision, confidence)
 
-    return SimulationResult(
+    final_decision = max(
+        set(votes.values()),
+        key=lambda d: list(votes.values()).count(d)
+    )
+
+    capital = capital_allocation(final_decision, confidence)
+
+    return DecisionResult(
         generation=GENERATION,
         agent_id=agent_id,
-        decision=decision,
-        confidence=confidence,
+        agent_decision=decision,
+        council_decision=final_decision,
+        capital_allocated=capital,
         fitness=agent["fitness"],
         genome=copy.deepcopy(genome),
+        votes=votes,
         note=note,
         timestamp=time.time()
     )
 
 
 # =========================
-# TOURNAMENT (PHASE 80)
-# =========================
-
-@app.get("/tournament")
-def tournament():
-    ranked = sorted(
-        AGENTS.items(),
-        key=lambda x: x[1]["fitness"],
-        reverse=True
-    )
-
-    winner_id, winner = ranked[0]
-
-    return {
-        "winner": winner_id,
-        "fitness": winner["fitness"],
-        "genome": winner["genome"],
-        "ranking": [
-            {"agent": i, "fitness": a["fitness"], "alive": a["alive"]}
-            for i, a in ranked
-        ]
-    }
-
-
-# =========================
-# DEBUG / RESET
+# DASHBOARD / DEBUG
 # =========================
 
 @app.get("/agents")
 def agents():
     return AGENTS
+
+
+@app.get("/council")
+def council():
+    return list(CEO_COUNCIL.keys())
 
 
 @app.post("/reset")
