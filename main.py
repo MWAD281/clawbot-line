@@ -5,10 +5,11 @@ from datetime import datetime
 from typing import Dict, List
 import random
 import uuid
+import copy
 
 app = FastAPI(
-    title="ClawBot Phase 37 – Darwinism Core",
-    version="0.3.0"
+    title="ClawBot Phase 38 – Mutation Engine",
+    version="0.4.0"
 )
 
 # =========================
@@ -36,19 +37,32 @@ class MarketInput(BaseModel):
 # =========================
 AGENTS: Dict[str, dict] = {}
 
-def spawn_agent(role: str):
+def random_gene():
+    return {
+        "aggression": round(random.uniform(0.0, 1.0), 2),
+        "risk_tolerance": round(random.uniform(0.0, 1.0), 2),
+        "reactivity": round(random.uniform(0.0, 1.0), 2),
+    }
+
+def mutate_gene(parent_gene):
+    gene = copy.deepcopy(parent_gene)
+    key = random.choice(list(gene.keys()))
+    gene[key] = min(1.0, max(0.0, gene[key] + random.uniform(-0.15, 0.15)))
+    return gene
+
+def spawn_agent(parent=None):
     agent_id = str(uuid.uuid4())[:8]
     AGENTS[agent_id] = {
         "id": agent_id,
-        "role": role,
         "score": 0.0,
         "alive": True,
+        "gene": mutate_gene(parent["gene"]) if parent else random_gene(),
         "created_at": datetime.utcnow().isoformat()
     }
 
-# Initial agents
-for role in ["Risk", "Macro", "Opportunist"]:
-    spawn_agent(role)
+# initial population
+for _ in range(3):
+    spawn_agent()
 
 # =========================
 # Memory
@@ -56,52 +70,56 @@ for role in ["Risk", "Macro", "Opportunist"]:
 MEMORY: List[dict] = []
 
 # =========================
-# Agent Logic
+# Decision Engine
 # =========================
 def agent_decision(agent, data: MarketInput):
-    role = agent["role"]
+    g = agent["gene"]
 
-    if role == "Risk":
-        return "DEFENSIVE" if data.risk_level == "high" else "HOLD"
+    aggression = g["aggression"]
+    risk = g["risk_tolerance"]
 
-    if role == "Macro":
-        if data.trend == "up":
-            return "AGGRESSIVE"
-        if data.trend == "down":
-            return "DEFENSIVE"
-        return "HOLD"
+    danger = 1 if data.risk_level == "high" else 0
+    trend_up = 1 if data.trend == "up" else -1 if data.trend == "down" else 0
 
-    if role == "Opportunist":
-        return "AGGRESSIVE" if data.volatility in ["high", "extreme"] else "HOLD"
+    score = aggression * trend_up - danger * (1 - risk)
 
+    if score > 0.3:
+        return "AGGRESSIVE"
+    if score < -0.3:
+        return "DEFENSIVE"
     return "HOLD"
 
 # =========================
-# Scoring System
+# Scoring
 # =========================
 def evaluate(decision: str, data: MarketInput):
-    # simple reward model (placeholder for real PnL)
     if decision == "AGGRESSIVE" and data.trend == "up":
-        return +1.0
+        return +1.2
     if decision == "DEFENSIVE" and data.trend == "down":
-        return +0.8
+        return +1.0
     if decision == "AGGRESSIVE" and data.trend == "down":
-        return -1.2
-    return -0.2
+        return -1.5
+    return -0.1
 
 # =========================
-# Darwinism Engine
+# Darwinism + Mutation
 # =========================
-def darwin_cycle():
-    dead = []
-    for agent_id, agent in AGENTS.items():
-        if agent["score"] < -3:
-            agent["alive"] = False
-            dead.append(agent_id)
+def evolution_cycle():
+    global AGENTS
 
-    for agent_id in dead:
-        del AGENTS[agent_id]
-        spawn_agent(random.choice(["Risk", "Macro", "Opportunist"]))
+    # sort by performance
+    ranked = sorted(AGENTS.values(), key=lambda x: x["score"], reverse=True)
+
+    survivors = ranked[:max(1, len(ranked)//2)]
+    dead = ranked[len(survivors):]
+
+    for d in dead:
+        AGENTS.pop(d["id"], None)
+
+    # reproduce from best agents
+    while len(AGENTS) < 3:
+        parent = random.choice(survivors)
+        spawn_agent(parent)
 
 # =========================
 # Root
@@ -109,9 +127,8 @@ def darwin_cycle():
 @app.get("/")
 def root():
     return {
-        "status": "ClawBot Phase 37 ONLINE",
-        "agents_alive": len(AGENTS),
-        "memory_records": len(MEMORY),
+        "status": "ClawBot Phase 38 ONLINE",
+        "agents": len(AGENTS),
         "timestamp": datetime.utcnow().isoformat()
     }
 
@@ -120,35 +137,32 @@ def root():
 # =========================
 @app.post("/simulate/market")
 def simulate_market(data: MarketInput):
-    results = []
+    cycle = []
 
     for agent in AGENTS.values():
         decision = agent_decision(agent, data)
         reward = evaluate(decision, data)
         agent["score"] += reward
 
-        results.append({
+        cycle.append({
             "agent_id": agent["id"],
-            "role": agent["role"],
             "decision": decision,
             "reward": reward,
-            "score": agent["score"]
+            "score": agent["score"],
+            "gene": agent["gene"]
         })
 
-    darwin_cycle()
+    evolution_cycle()
 
-    record = {
+    MEMORY.append({
         "input": data.dict(),
-        "results": results,
-        "agents_alive": len(AGENTS),
+        "cycle": cycle,
         "timestamp": datetime.utcnow().isoformat()
-    }
-
-    MEMORY.append(record)
+    })
 
     return {
-        "engine": "ClawBot Phase 37",
-        "cycle_result": results,
+        "engine": "ClawBot Phase 38",
+        "cycle": cycle,
         "agents_alive": len(AGENTS)
     }
 
@@ -158,16 +172,15 @@ def simulate_market(data: MarketInput):
 @app.get("/dashboard")
 def dashboard():
     return {
-        "phase": 37,
+        "phase": 38,
         "agents": list(AGENTS.values()),
         "memory_size": len(MEMORY),
-        "last_cycle": MEMORY[-1] if MEMORY else None,
-        "status": "EVOLVING",
+        "status": "MUTATING",
         "timestamp": datetime.utcnow().isoformat()
     }
 
 # =========================
-# LINE Webhook Stub
+# LINE Webhook
 # =========================
 @app.post("/line/webhook")
 async def line_webhook(request: Request):
