@@ -3,6 +3,8 @@ import hmac
 import hashlib
 import base64
 import requests
+import time
+
 from fastapi import FastAPI, Request, HTTPException
 
 from agents.finance_agents import run_finance_swarm
@@ -10,6 +12,10 @@ from memory.judgment_state import get_judgment, overwrite_judgment
 from evolution.judgment_evolver import evolve_from_ai
 from world.routes import router as world_router
 
+
+# =========================
+# APP
+# =========================
 
 app = FastAPI()
 app.include_router(world_router)
@@ -20,14 +26,15 @@ LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
 LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply"
 OPENAI_URL = "https://api.openai.com/v1/responses"
 
+
 # =========================
-# Trigger Logic
+# MODE DETECTION
 # =========================
 
 def detect_mode(user_text: str) -> str:
     text = user_text.lower()
 
-    if "โลก" in text or "น่ากลัว" in text or "ลึก" in text:
+    if any(k in text for k in ["โลก", "น่ากลัว", "ลึก"]):
         return "deep"
     if any(k in text for k in ["ลงทุน", "สินทรัพย์", "หุ้น", "ดอกเบี้ย"]):
         return "investor"
@@ -42,6 +49,10 @@ def detect_mode(user_text: str) -> str:
 
     return "short_sharp"
 
+
+# =========================
+# PROMPT
+# =========================
 
 def build_system_prompt(mode: str) -> str:
     if mode == "deep":
@@ -80,12 +91,13 @@ async def line_webhook(request: Request):
     body = await request.body()
     x_line_signature = request.headers.get("X-Line-Signature")
 
-    hash = hmac.new(
+    # verify signature
+    hash_value = hmac.new(
         LINE_CHANNEL_SECRET.encode("utf-8"),
         body,
         hashlib.sha256
     ).digest()
-    signature = base64.b64encode(hash).decode()
+    signature = base64.b64encode(hash_value).decode()
 
     if not hmac.compare_digest(signature, x_line_signature):
         raise HTTPException(status_code=400, detail="Invalid signature")
@@ -97,11 +109,17 @@ async def line_webhook(request: Request):
             continue
 
         reply_token = event["replyToken"]
-        user_text = event["message"].get("text", "")
+        user_text = event["message"].get("text", "").strip()
+
+        if not user_text:
+            continue
 
         mode = detect_mode(user_text)
+        start_time = time.time()
 
-        # 🤖 CALL AI (กันพัง)
+        # =========================
+        # CALL AI (SAFE)
+        # =========================
         try:
             if mode in ["crypto", "commodity", "watchlist"]:
                 ai_text = run_finance_swarm(user_text)
@@ -115,14 +133,18 @@ async def line_webhook(request: Request):
             ai_text = "ระบบกำลังประมวลผลหนัก ลองถามใหม่อีกครั้ง"
             ai_raw = None
 
-        # 🧬 EVOLVE (ไม่ให้ webhook พัง)
+        # =========================
+        # EVOLUTION (FAIL-SAFE)
+        # =========================
         try:
-            if ai_raw:
-                evolve_from_ai(user_text, ai_raw)
+            if isinstance(ai_raw, dict):
+                evolve_from_ai(get_judgment(), ai_raw)
         except Exception as e:
             print("EVOLVE ERROR:", e)
 
-        # 📤 REPLY LINE
+        # =========================
+        # REPLY LINE (FAIL-SAFE)
+        # =========================
         try:
             reply_line(reply_token, ai_text)
         except Exception as e:
@@ -146,9 +168,9 @@ def call_openai(user_text: str, mode: str) -> dict:
 
     system_prompt += (
         "\n\n[GLOBAL JUDGMENT STATE]\n"
-        f"Global Risk: {judgment['global_risk']}\n"
-        f"Worldview: {judgment['worldview']}\n"
-        f"Stance: {judgment['stance']}\n"
+        f"Global Risk: {judgment.get('global_risk')}\n"
+        f"Worldview: {judgment.get('worldview')}\n"
+        f"Stance: {judgment.get('stance')}\n"
     )
 
     payload = {
@@ -191,7 +213,7 @@ def reply_line(reply_token: str, text: str):
         ]
     }
 
-    requests.post(LINE_REPLY_URL, headers=headers, json=payload)
+    requests.post(LINE_REPLY_URL, headers=headers, json=payload, timeout=10)
 
 
 # =========================
