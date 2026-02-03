@@ -8,9 +8,10 @@ import copy
 import statistics
 import math
 import time
+import threading
 
 app = FastAPI(
-    title="ClawBot Phase 49 – Memory Compression + Forgetting Curve",
+    title="ClawBot Phase 50 – Autonomous Live Loop",
     version="1.0.0"
 )
 
@@ -54,9 +55,13 @@ RAW_MEMORY_LIMIT = 60
 COMPRESSED_MEMORY_LIMIT = 20
 HOF_LIMIT = 10
 
-FORGET_HALF_LIFE = 20  # ยิ่งมาก ยิ่งลืมช้า (เป็นจำนวน cycle)
+FORGET_HALF_LIFE = 20
+LOOP_INTERVAL = 15  # วินาทีต่อ 1 cycle (ปรับได้)
 
 GENERATION = 1
+CYCLE = 0
+RUNNING = True
+
 AGENTS: Dict[str, dict] = {}
 HALL_OF_FAME: List[dict] = []
 
@@ -97,7 +102,6 @@ def spawn_agent(parent_gene=None, role=None, capital=BASE_CAPITAL):
         "role": role or random.choice(STRATEGY_ROLES),
         "gene": gene,
         "capital": capital,
-        "equity": capital,
         "peak": capital,
         "alive": True,
         "position": None,
@@ -111,9 +115,18 @@ for _ in range(POPULATION_SIZE):
     spawn_agent()
 
 # =========================
-# Market Regime
+# Market Simulator (Internal)
 # =========================
-def detect_regime(m: MarketInput):
+def random_market():
+    momentum = round(random.uniform(-1, 1), 2)
+    return MarketInput(
+        volatility=random.choice(["low", "medium", "high"]),
+        liquidity=random.choice(["loose", "normal", "tight"]),
+        momentum=momentum,
+        price=round(100 + random.uniform(-5, 5), 2)
+    )
+
+def detect_regime(m):
     if m.momentum > 0.6:
         return "BULL"
     if m.momentum < -0.6:
@@ -121,57 +134,48 @@ def detect_regime(m: MarketInput):
     return "SIDEWAYS"
 
 # =========================
-# Memory Engine (NEW)
+# Memory Engine
 # =========================
 def forgetting_weight(age):
-    # Exponential decay
     return math.exp(-math.log(2) * age / FORGET_HALF_LIFE)
 
 def compress_memory(agent):
-    """
-    รวม memory ที่ regime + momentum ใกล้กัน
-    เก็บเฉพาะ 'แก่น' ที่มี impact สูง
-    """
     buckets = {}
     for m in agent["raw_memory"]:
         key = (m["regime"], round(m["momentum"], 1))
-        if key not in buckets:
-            buckets[key] = []
-        buckets[key].append(m)
+        buckets.setdefault(key, []).append(m)
 
     compressed = []
-    for (regime, mom), records in buckets.items():
-        avg_pnl = statistics.mean(r["pnl"] for r in records)
+    for (regime, mom), recs in buckets.items():
+        avg_pnl = statistics.mean(r["pnl"] for r in recs)
         compressed.append({
             "regime": regime,
             "momentum": mom,
             "pnl": avg_pnl,
-            "count": len(records),
-            "timestamp": max(r["timestamp"] for r in records)
+            "count": len(recs),
+            "timestamp": max(r["timestamp"] for r in recs)
         })
 
     compressed.sort(key=lambda x: abs(x["pnl"]), reverse=True)
     agent["compressed_memory"] = compressed[:COMPRESSED_MEMORY_LIMIT]
 
-def memory_bias(agent, snapshot):
+def memory_bias(agent, regime):
     score = 0.0
     now = time.time()
     for m in agent["compressed_memory"]:
-        if m["regime"] != snapshot["regime"]:
+        if m["regime"] != regime:
             continue
-        age = snapshot["t"] - m["timestamp"]
-        w = forgetting_weight(age)
-        score += w * m["pnl"]
+        age = now - m["timestamp"]
+        score += forgetting_weight(age) * m["pnl"]
     return score
 
 # =========================
-# Decision Engine
+# Trading Logic
 # =========================
 def decide(agent, market, regime):
-    bias = memory_bias(agent, {
-        "regime": regime,
-        "t": time.time()
-    })
+    bias = memory_bias(agent, regime)
+    if bias > 0.015:
+        return "ENTER"
 
     if agent["role"] == "TREND" and abs(market.momentum) > 0.4:
         return "ENTER"
@@ -181,75 +185,36 @@ def decide(agent, market, regime):
         return "SCALP"
     if agent["role"] == "CRISIS" and market.momentum < -0.7:
         return "ENTER"
-
-    if bias > 0.015:
-        return "ENTER"
-
     return "HOLD"
 
-# =========================
-# Execution
-# =========================
-def slippage(market):
-    return SLIPPAGE_BASE * {"loose": 0.8, "normal": 1.0, "tight": 1.6}[market.liquidity]
+def slippage(m):
+    return SLIPPAGE_BASE * {"loose": 0.8, "normal": 1.0, "tight": 1.6}[m.liquidity]
 
-def position_size(agent, risk_factor=1.0):
-    return max(
-        0.01,
-        min(
-            0.6,
-            agent["gene"]["base_position"]
-            * agent["gene"]["risk_tolerance"]
-            * risk_factor
-        )
-    )
+def position_size(agent, risk_factor):
+    return max(0.01, min(0.6, agent["gene"]["base_position"] * agent["gene"]["risk_tolerance"] * risk_factor))
 
 def open_position(agent, side, price, size, market):
-    fill = price * (1 + slippage(market) if side == "LONG" else 1 - slippage(market))
-    fee = agent["capital"] * size * TAKER_FEE
-    agent["capital"] -= fee
-    agent["position"] = {"side": side, "entry": fill, "size": size}
+    agent["position"] = {"side": side, "entry": price, "size": size}
 
-def close_position(agent, price, market, regime, momentum):
+def close_position(agent, price, regime, momentum):
     pos = agent["position"]
-    exit_price = price * (1 - slippage(market) if pos["side"] == "LONG" else 1 + slippage(market))
-    pnl_ratio = (exit_price - pos["entry"]) / pos["entry"]
+    pnl_ratio = (price - pos["entry"]) / pos["entry"]
     if pos["side"] == "SHORT":
         pnl_ratio = -pnl_ratio
 
     pnl = agent["capital"] * pos["size"] * pnl_ratio
-    fee = abs(pnl) * TAKER_FEE
-    agent["capital"] += pnl - fee
+    agent["capital"] += pnl
     agent["returns"].append(pnl_ratio)
 
     agent["raw_memory"].append({
         "regime": regime,
-        "momentum": round(momentum, 2),
+        "momentum": momentum,
         "pnl": pnl_ratio,
         "timestamp": time.time()
     })
     agent["raw_memory"] = agent["raw_memory"][-RAW_MEMORY_LIMIT:]
     compress_memory(agent)
-
     agent["position"] = None
-
-# =========================
-# Portfolio Risk
-# =========================
-def portfolio_equity():
-    return sum(a["capital"] for a in AGENTS.values() if a["alive"])
-
-def portfolio_returns():
-    r = []
-    for a in AGENTS.values():
-        r.extend(a["returns"][-5:])
-    return r
-
-def portfolio_var():
-    r = portfolio_returns()
-    if len(r) < 5:
-        return 0.0
-    return abs(statistics.mean(r) - 2 * statistics.stdev(r))
 
 # =========================
 # Evolution
@@ -257,33 +222,48 @@ def portfolio_var():
 def evolve():
     global GENERATION, AGENTS
     GENERATION += 1
+    ranked = sorted(AGENTS.values(), key=lambda a: a["capital"], reverse=True)
 
-    alive = [a for a in AGENTS.values() if a["alive"]]
-    if not alive:
-        AGENTS.clear()
-        for _ in range(POPULATION_SIZE):
-            spawn_agent()
-        return
-
-    ranked = sorted(alive, key=lambda a: a["capital"], reverse=True)
     champ = ranked[0]
-
     HALL_OF_FAME.append({
         "gene": champ["gene"],
-        "role": champ["role"],
         "capital": round(champ["capital"], 2),
         "gen": GENERATION
     })
-    HALL_OF_FAME.sort(key=lambda x: x["capital"], reverse=True)
-    del HALL_OF_FAME[HOF_LIMIT:]
+    HALL_OF_FAME[:] = sorted(HALL_OF_FAME, key=lambda x: x["capital"], reverse=True)[:HOF_LIMIT]
 
     survivors = ranked[:max(3, len(ranked)//2)]
-    AGENTS = {a["id"]: a for a in survivors}
+    AGENTS.clear()
+    for a in survivors:
+        AGENTS[a["id"]] = a
 
     while len(AGENTS) < POPULATION_SIZE:
-        parent = random.choice(survivors)
-        g = crossover(champ["gene"], parent["gene"])
-        spawn_agent(g, role=parent["role"])
+        p = random.choice(survivors)
+        spawn_agent(p["gene"], p["role"])
+
+# =========================
+# Autonomous Loop (NEW)
+# =========================
+def autonomous_loop():
+    global CYCLE, RUNNING
+    while RUNNING:
+        market = random_market()
+        regime = detect_regime(market)
+
+        for a in AGENTS.values():
+            if a["position"]:
+                close_position(a, market.price, regime, market.momentum)
+
+            decision = decide(a, market, regime)
+            if decision in ["ENTER", "SCALP"]:
+                side = "LONG" if regime == "BULL" else "SHORT"
+                open_position(a, side, market.price, position_size(a, 1.0), market)
+
+        evolve()
+        CYCLE += 1
+        time.sleep(LOOP_INTERVAL)
+
+threading.Thread(target=autonomous_loop, daemon=True).start()
 
 # =========================
 # Routes
@@ -291,49 +271,18 @@ def evolve():
 @app.get("/")
 def root():
     return {
-        "status": "ClawBot Phase 49 ONLINE",
+        "status": "ClawBot Phase 50 RUNNING",
         "generation": GENERATION,
-        "portfolio_equity": round(portfolio_equity(), 2)
-    }
-
-@app.post("/simulate/market")
-def simulate(market: MarketInput):
-    regime = detect_regime(market)
-
-    var = portfolio_var()
-    risk_factor = 1.0
-    if var > VAR_LIMIT:
-        risk_factor *= RISK_REDUCTION_FACTOR
-
-    if portfolio_equity() < TOTAL_CAPITAL * (1 - PORTFOLIO_MAX_DD):
-        for a in AGENTS.values():
-            a["position"] = None
-        return {"status": "PORTFOLIO KILL SWITCH"}
-
-    for agent in AGENTS.values():
-        if agent["position"]:
-            close_position(agent, market.price, market, regime, market.momentum)
-
-        decision = decide(agent, market, regime)
-        if decision in ["ENTER", "SCALP"]:
-            side = "LONG" if regime == "BULL" else "SHORT"
-            open_position(agent, side, market.price, position_size(agent, risk_factor), market)
-
-    evolve()
-
-    return {
-        "phase": 49,
-        "generation": GENERATION,
-        "portfolio_var": round(var, 4),
+        "cycle": CYCLE,
         "agents": len(AGENTS)
     }
 
 @app.get("/dashboard")
 def dashboard():
     return {
-        "phase": 49,
+        "phase": 50,
         "generation": GENERATION,
-        "portfolio_equity": portfolio_equity(),
+        "cycle": CYCLE,
         "agents": list(AGENTS.values()),
         "hall_of_fame": HALL_OF_FAME
     }
