@@ -7,22 +7,23 @@ import uuid
 import copy
 
 app = FastAPI(
-    title="ClawBot Phase 94 – Testnet Ready Core",
-    version="94.0.0",
-    description="Exchange adapter + risk control + survival ranking"
+    title="ClawBot Phase 94.5 – Production Safe Core",
+    version="94.5.0",
+    description="Testnet-ready + per-agent risk guard + smart sizing"
 )
 
 # =========================
 # GLOBAL CONFIG
 # =========================
 
-PHASE = 94
+PHASE = 94.5
 MAX_AGENTS = 5
 
 INITIAL_CAPITAL = 100_000.0
-MAX_RISK_PER_TRADE = 0.02      # 2% ต่อไม้
-STOP_LOSS_PCT = 0.03           # 3% SL
-TAKE_PROFIT_PCT = 0.06         # 6% TP
+MAX_RISK_PER_TRADE = 0.02        # 2% ต่อไม้
+MAX_AGENT_DRAWDOWN = -0.20       # agent ใดขาดทุน 20% = ตาย
+STOP_LOSS_PCT = 0.03
+TAKE_PROFIT_PCT = 0.06
 MIN_FITNESS = 0.55
 MUTATION_RATE = 0.10
 GLOBAL_MAX_DRAWDOWN = -0.30
@@ -69,6 +70,7 @@ def spawn_agent(agent_id: int):
         "genome": create_genome(),
         "fitness": round(random.uniform(0.6, 0.8), 3),
         "capital": INITIAL_CAPITAL / MAX_AGENTS,
+        "peak_capital": INITIAL_CAPITAL / MAX_AGENTS,
         "alive": True,
         "wins": 0,
         "losses": 0,
@@ -104,6 +106,10 @@ def global_drawdown():
     return (total - INITIAL_CAPITAL) / INITIAL_CAPITAL
 
 
+def agent_drawdown(agent):
+    return (agent["capital"] - agent["peak_capital"]) / agent["peak_capital"]
+
+
 def agent_decide(genome):
     r = random.random()
     if r < genome["aggression"]:
@@ -113,8 +119,10 @@ def agent_decide(genome):
     return "HOLD"
 
 
-def position_size(capital):
-    return round(capital * MAX_RISK_PER_TRADE, 2)
+def position_size(capital, confidence):
+    base = capital * MAX_RISK_PER_TRADE
+    scaled = base * min(confidence, 0.9)
+    return round(scaled, 2)
 
 
 def update_fitness(agent, pnl):
@@ -134,23 +142,17 @@ def maybe_mutate(genome):
     return None
 
 # =========================
-# EXCHANGE ADAPTER (Phase 92)
+# EXCHANGE ADAPTER (SAFE)
 # =========================
 
 def execute_trade(exchange, decision, price, size):
-    """
-    Sandbox now
-    Binance / Bybit testnet -> plug API here
-    """
     if decision == "HOLD":
         return price, price, 0.0
 
     entry = price * (1 + random.uniform(-0.001, 0.001))
-
     move = random.uniform(-0.07, 0.08)
     raw_exit = entry * (1 + move)
 
-    # Stop loss / Take profit
     sl = entry * (1 - STOP_LOSS_PCT)
     tp = entry * (1 + TAKE_PROFIT_PCT)
 
@@ -211,12 +213,13 @@ def simulate_market(input: MarketInput):
     votes = {k: f(decision, confidence) for k, f in CEO_COUNCIL.items()}
     final_decision = max(set(votes.values()), key=lambda d: list(votes.values()).count(d))
 
-    size = position_size(agent["capital"])
+    size = position_size(agent["capital"], confidence)
     entry, exit_p, pnl = execute_trade(
         input.exchange, final_decision, input.price, size
     )
 
     agent["capital"] += pnl
+    agent["peak_capital"] = max(agent["peak_capital"], agent["capital"])
     agent["trades"] += 1
 
     if pnl > 0:
@@ -227,10 +230,11 @@ def simulate_market(input: MarketInput):
     update_fitness(agent, pnl)
 
     note = "ok"
-    if agent["fitness"] < MIN_FITNESS:
+
+    if agent_drawdown(agent) <= MAX_AGENT_DRAWDOWN or agent["fitness"] < MIN_FITNESS:
         agent["alive"] = False
         spawn_agent(agent_id)
-        note = "agent died → reborn"
+        note = "agent killed → reborn (risk)"
 
     mut = maybe_mutate(genome)
     if mut:
@@ -263,7 +267,7 @@ def simulate_market(input: MarketInput):
     )
 
 # =========================
-# PHASE 94 – SURVIVAL RANKING
+# RANKING / MONITOR
 # =========================
 
 @app.get("/ranking")
@@ -291,11 +295,6 @@ def ranking():
             for i, a in ranked
         ]
     }
-
-
-@app.get("/agents")
-def agents():
-    return AGENTS
 
 
 @app.get("/trades")
