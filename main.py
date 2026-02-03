@@ -9,7 +9,7 @@ import copy
 # APP
 # ==================================================
 
-app = FastAPI(title="ClawBot Multi-World Darwinism")
+app = FastAPI(title="ClawBot Phase 12 – Capital Darwinism")
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,7 +35,7 @@ def new_agent(name: str) -> Dict:
         "id": uid(),
         "name": name,
         "hp": 100,
-        "fitness": round(random.uniform(0.8, 1.2), 2),
+        "fitness": round(random.uniform(0.9, 1.1), 2),
         "alive": True
     }
 
@@ -44,19 +44,15 @@ def agent_vote(agent: Dict, market: Dict):
         return None
 
     if agent["name"].startswith("HAWK") and market["risk_level"] == "high":
-        return "RISK_UP"
-
+        return "RISK_ON"
     if agent["name"].startswith("DOVE") and market["trend"] == "down":
-        return "STABLE"
-
-    if agent["name"].startswith("CHAOS") and market["volatility"] == "extreme":
-        return "CHAOS"
-
-    if agent["name"].startswith("HIST") and market["risk_level"] == "high":
-        return "CRISIS_PATTERN"
-
-    if agent["name"].startswith("SURV") and market["liquidity"] == "tight":
         return "DEFENSIVE"
+    if agent["name"].startswith("CHAOS") and market["volatility"] == "extreme":
+        return "VOL_PLAY"
+    if agent["name"].startswith("HIST") and market["risk_level"] == "high":
+        return "CRISIS_MEMORY"
+    if agent["name"].startswith("SURV") and market["liquidity"] == "tight":
+        return "CASH"
 
     return None
 
@@ -64,11 +60,13 @@ def agent_vote(agent: Dict, market: Dict):
 # WORLD
 # ==================================================
 
-def new_world() -> Dict:
+def new_world(seed_capital: float = 100_000.0) -> Dict:
     return {
         "id": uid(),
-        "stability": 1.0,
         "generation": 1,
+        "stability": 1.0,
+        "capital": seed_capital,
+        "return_pct": 0.0,
         "council": [
             new_agent("HAWK"),
             new_agent("DOVE"),
@@ -85,23 +83,46 @@ WORLDS: List[Dict] = [new_world() for _ in range(3)]
 # MARKET EVAL
 # ==================================================
 
-def evaluate_market(market: Dict):
-    score = 0.0
+def market_severity(market: Dict) -> float:
+    sev = 0.0
     if market["risk_level"] == "high":
-        score -= 0.3
+        sev += 0.3
     if market["trend"] == "down":
-        score -= 0.3
+        sev += 0.3
     if market["volatility"] == "extreme":
-        score -= 0.2
+        sev += 0.2
     if market["liquidity"] == "tight":
-        score -= 0.2
-    return round(score, 2)
+        sev += 0.2
+    return round(sev, 2)
+
+# ==================================================
+# CAPITAL LOGIC
+# ==================================================
+
+def capital_outcome(votes: List[str], severity: float) -> float:
+    """
+    ผลตอบแทนโดยคร่าว:
+    - defensive / cash ช่วยลด drawdown
+    - risk_on ในตลาดรุนแรง = เจ็บ
+    """
+    base = -severity
+
+    if "DEFENSIVE" in votes:
+        base += 0.15
+    if "CASH" in votes:
+        base += 0.2
+    if "RISK_ON" in votes and severity > 0.5:
+        base -= 0.2
+    if "VOL_PLAY" in votes:
+        base += random.uniform(-0.1, 0.1)
+
+    return round(base, 3)
 
 # ==================================================
 # DARWINISM
 # ==================================================
 
-def apply_agent_darwin(world: Dict, severity: float):
+def evolve_agents(world: Dict, severity: float):
     for agent in world["council"]:
         if not agent["alive"]:
             continue
@@ -115,34 +136,34 @@ def apply_agent_darwin(world: Dict, severity: float):
         if agent["hp"] <= 0:
             agent["alive"] = False
 
-def rebirth_agents(world: Dict):
+def rebirth(world: Dict):
     for agent in world["council"]:
         if not agent["alive"]:
             agent.update(new_agent(agent["name"] + "_v2"))
 
 def world_decay(world: Dict, severity: float):
-    world["stability"] -= severity * 0.5
+    world["stability"] -= severity * 0.4
     world["generation"] += 1
 
 # ==================================================
-# MULTI-WORLD EVOLUTION
+# MULTI-WORLD SELECTION
 # ==================================================
 
 def evolve_worlds():
     global WORLDS
 
-    # kill unstable worlds
-    WORLDS = [w for w in WORLDS if w["stability"] > 0]
+    # ลบโลกที่เงินหมดหรือเสถียรภาพพัง
+    WORLDS = [w for w in WORLDS if w["capital"] > 10_000 and w["stability"] > 0]
 
-    # rank
-    WORLDS.sort(key=lambda w: w["stability"], reverse=True)
+    WORLDS.sort(key=lambda w: (w["capital"], w["stability"]), reverse=True)
 
-    # clone best world if count < 3
+    # clone โลกที่เก่ง
     while len(WORLDS) < 3:
         parent = copy.deepcopy(WORLDS[0])
         parent["id"] = uid()
-        parent["stability"] *= random.uniform(0.9, 1.1)
         parent["generation"] += 1
+        parent["capital"] *= random.uniform(0.9, 1.05)
+        parent["stability"] *= random.uniform(0.9, 1.1)
         WORLDS.append(parent)
 
 # ==================================================
@@ -151,7 +172,7 @@ def evolve_worlds():
 
 @app.get("/")
 def root():
-    return {"status": "Multi-World Darwinism Online"}
+    return {"status": "Phase 12 Capital Darwinism Online"}
 
 @app.get("/worlds")
 def list_worlds():
@@ -171,24 +192,30 @@ def simulate_market(
         "liquidity": liquidity
     }
 
+    sev = market_severity(market)
+
     for world in WORLDS:
         votes = []
         for agent in world["council"]:
-            vote = agent_vote(agent, market)
-            if vote:
-                votes.append(vote)
+            v = agent_vote(agent, market)
+            if v:
+                votes.append(v)
 
-        score = evaluate_market(market)
-        severity = abs(score)
+        ret = capital_outcome(votes, sev)
+        pnl = world["capital"] * ret
 
-        apply_agent_darwin(world, severity)
-        rebirth_agents(world)
-        world_decay(world, severity)
+        world["capital"] += pnl
+        world["return_pct"] = ret
+
+        evolve_agents(world, sev)
+        rebirth(world)
+        world_decay(world, sev)
 
         world["history"].append({
             "market": market,
             "votes": votes,
-            "score": score
+            "return_pct": ret,
+            "capital": round(world["capital"], 2)
         })
 
     evolve_worlds()
@@ -196,10 +223,13 @@ def simulate_market(
     return {
         "status": "SIMULATION_COMPLETE",
         "market": market,
-        "world_rank": sorted(
-            [{"id": w["id"], "stability": round(w["stability"], 3)} for w in WORLDS],
-            key=lambda x: x["stability"],
-            reverse=True
-        ),
-        "worlds": WORLDS
+        "world_rank": [
+            {
+                "id": w["id"],
+                "capital": round(w["capital"], 2),
+                "stability": round(w["stability"], 3),
+                "generation": w["generation"]
+            }
+            for w in sorted(WORLDS, key=lambda x: x["capital"], reverse=True)
+        ]
     }
