@@ -1,11 +1,19 @@
 # main.py
+
 from fastapi import FastAPI
-from api import router as api_router
+from routers.health import router as health_router
+from world.market_probe import get_market_snapshot
 
 app = FastAPI(title="ClawBot")
 
-app.include_router(api_router)
+app.include_router(health_router)
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+
+@app.get("/")
+def root():
+    return {
+        "service": "clawbot-line",
+        "status": "running",
+        "phase": 96,
+        "market": get_market_snapshot()
+    }
