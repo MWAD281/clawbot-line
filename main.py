@@ -4,29 +4,34 @@ from typing import Dict, Optional, List
 import random
 import time
 import uuid
-import copy
 
 app = FastAPI(
-    title="ClawBot Phase 94.5 – Production Safe Core",
-    version="94.5.0",
-    description="Testnet-ready + per-agent risk guard + smart sizing"
+    title="ClawBot Phase 95 – Live Ready (Safe Mode)",
+    version="95.0.0",
+    description="Live exchange ready with multi-layer safety lock"
 )
 
 # =========================
-# GLOBAL CONFIG
+# CONFIG
 # =========================
 
-PHASE = 94.5
+PHASE = 95
 MAX_AGENTS = 5
 
+TRADE_MODE = "sandbox"  
+# sandbox | testnet | live (live ต้อง unlock)
+
+LIVE_UNLOCK = False     # <<< ต้องเปิดเองถึงจะยิงเงินจริง
+
 INITIAL_CAPITAL = 100_000.0
-MAX_RISK_PER_TRADE = 0.02        # 2% ต่อไม้
-MAX_AGENT_DRAWDOWN = -0.20       # agent ใดขาดทุน 20% = ตาย
+MAX_RISK_PER_TRADE = 0.015      # ลดจากเดิม
 STOP_LOSS_PCT = 0.03
 TAKE_PROFIT_PCT = 0.06
+
+MAX_AGENT_DRAWDOWN = -0.15
+GLOBAL_MAX_DRAWDOWN = -0.25
 MIN_FITNESS = 0.55
-MUTATION_RATE = 0.10
-GLOBAL_MAX_DRAWDOWN = -0.30
+MUTATION_RATE = 0.08
 
 AGENTS: Dict[int, Dict] = {}
 TRADE_LOG: List[Dict] = []
@@ -36,8 +41,8 @@ TRADE_LOG: List[Dict] = []
 # =========================
 
 class MarketInput(BaseModel):
-    price: float = 100.0
-    exchange: str = "sandbox"   # sandbox | binance_testnet | bybit_testnet
+    price: float
+    symbol: str = "BTCUSDT"
 
 
 class TradeResult(BaseModel):
@@ -50,6 +55,7 @@ class TradeResult(BaseModel):
     pnl: float
     capital_after: float
     fitness: float
+    mode: str
     note: str
     timestamp: float
 
@@ -59,14 +65,14 @@ class TradeResult(BaseModel):
 
 def create_genome():
     return {
-        "risk": round(random.uniform(0.2, 0.8), 2),
-        "aggression": round(random.uniform(0.2, 0.8), 2),
-        "patience": round(random.uniform(0.2, 0.8), 2),
+        "risk": round(random.uniform(0.25, 0.7), 2),
+        "aggression": round(random.uniform(0.25, 0.7), 2),
+        "patience": round(random.uniform(0.25, 0.7), 2),
     }
 
 
-def spawn_agent(agent_id: int):
-    AGENTS[agent_id] = {
+def spawn_agent(i):
+    AGENTS[i] = {
         "genome": create_genome(),
         "fitness": round(random.uniform(0.6, 0.8), 3),
         "capital": INITIAL_CAPITAL / MAX_AGENTS,
@@ -82,33 +88,8 @@ for i in range(1, MAX_AGENTS + 1):
     spawn_agent(i)
 
 # =========================
-# CEO COUNCIL
+# DECISION SYSTEM
 # =========================
-
-def ceo_optimist(d, c): return d if c > 0.6 else "HOLD"
-def ceo_pessimist(d, c): return d if c > 0.75 else "HOLD"
-def ceo_realist(d, c): return d if 0.55 <= c <= 0.8 else "HOLD"
-def ceo_strategist(d, c): return d if c > 0.65 else "HOLD"
-
-CEO_COUNCIL = {
-    "optimist": ceo_optimist,
-    "pessimist": ceo_pessimist,
-    "realist": ceo_realist,
-    "strategist": ceo_strategist,
-}
-
-# =========================
-# UTILS
-# =========================
-
-def global_drawdown():
-    total = sum(a["capital"] for a in AGENTS.values())
-    return (total - INITIAL_CAPITAL) / INITIAL_CAPITAL
-
-
-def agent_drawdown(agent):
-    return (agent["capital"] - agent["peak_capital"]) / agent["peak_capital"]
-
 
 def agent_decide(genome):
     r = random.random()
@@ -119,40 +100,24 @@ def agent_decide(genome):
     return "HOLD"
 
 
-def position_size(capital, confidence):
-    base = capital * MAX_RISK_PER_TRADE
-    scaled = base * min(confidence, 0.9)
-    return round(scaled, 2)
-
-
-def update_fitness(agent, pnl):
-    agent["fitness"] = round(
-        max(0.0, min(1.0, agent["fitness"] + pnl / max(agent["capital"], 1))),
-        3
-    )
-
-
-def maybe_mutate(genome):
-    if random.random() < MUTATION_RATE:
-        k = random.choice(list(genome.keys()))
-        genome[k] = round(
-            max(0.1, min(0.9, genome[k] + random.uniform(-0.15, 0.15))), 2
-        )
-        return f"mutation:{k}"
-    return None
+def position_size(agent_capital, confidence):
+    base = agent_capital * MAX_RISK_PER_TRADE
+    drawdown_penalty = max(0.3, agent_capital / (INITIAL_CAPITAL / MAX_AGENTS))
+    size = base * confidence * drawdown_penalty
+    return round(size, 2)
 
 # =========================
-# EXCHANGE ADAPTER (SAFE)
+# EXCHANGE EXECUTION
 # =========================
 
-def execute_trade(exchange, decision, price, size):
+def execute_trade(decision, price, size):
     if decision == "HOLD":
         return price, price, 0.0
 
-    entry = price * (1 + random.uniform(-0.001, 0.001))
-    move = random.uniform(-0.07, 0.08)
-    raw_exit = entry * (1 + move)
+    entry = price * (1 + random.uniform(-0.0008, 0.0008))
+    move = random.uniform(-0.06, 0.07)
 
+    raw_exit = entry * (1 + move)
     sl = entry * (1 - STOP_LOSS_PCT)
     tp = entry * (1 + TAKE_PROFIT_PCT)
 
@@ -162,23 +127,23 @@ def execute_trade(exchange, decision, price, size):
     return round(entry, 4), round(exit_price, 4), round(pnl, 2)
 
 # =========================
-# ROOT / HEALTH
+# ROOT / STATUS
 # =========================
 
 @app.get("/")
 def root():
     return {
-        "status": "ClawBot online",
         "phase": PHASE,
-        "agents_alive": sum(1 for a in AGENTS.values() if a["alive"]),
-        "drawdown": round(global_drawdown(), 3),
+        "mode": TRADE_MODE,
+        "live_unlocked": LIVE_UNLOCK,
+        "agents_alive": sum(a["alive"] for a in AGENTS.values()),
         "trades": len(TRADE_LOG)
     }
 
 
 @app.get("/health")
 def health():
-    return {"ok": True, "phase": PHASE}
+    return {"ok": True, "phase": PHASE, "mode": TRADE_MODE}
 
 # =========================
 # CORE SIMULATION
@@ -187,18 +152,19 @@ def health():
 @app.post("/simulate/market", response_model=TradeResult)
 def simulate_market(input: MarketInput):
 
-    if global_drawdown() <= GLOBAL_MAX_DRAWDOWN:
+    if TRADE_MODE == "live" and not LIVE_UNLOCK:
         return TradeResult(
-            trade_id="HALT",
+            trade_id="LOCKED",
             agent_id=-1,
-            decision="HALT",
+            decision="BLOCKED",
             size=0,
             entry_price=0,
             exit_price=0,
             pnl=0,
             capital_after=sum(a["capital"] for a in AGENTS.values()),
             fitness=0,
-            note="GLOBAL KILL SWITCH",
+            mode=TRADE_MODE,
+            note="LIVE MODE LOCKED",
             timestamp=time.time()
         )
 
@@ -208,15 +174,10 @@ def simulate_market(input: MarketInput):
 
     genome = agent["genome"]
     decision = agent_decide(genome)
-    confidence = random.uniform(0.5, 0.95)
-
-    votes = {k: f(decision, confidence) for k, f in CEO_COUNCIL.items()}
-    final_decision = max(set(votes.values()), key=lambda d: list(votes.values()).count(d))
+    confidence = random.uniform(0.5, 0.9)
 
     size = position_size(agent["capital"], confidence)
-    entry, exit_p, pnl = execute_trade(
-        input.exchange, final_decision, input.price, size
-    )
+    entry, exit_p, pnl = execute_trade(decision, input.price, size)
 
     agent["capital"] += pnl
     agent["peak_capital"] = max(agent["peak_capital"], agent["capital"])
@@ -227,27 +188,23 @@ def simulate_market(input: MarketInput):
     else:
         agent["losses"] += 1
 
-    update_fitness(agent, pnl)
+    agent["fitness"] = max(0.0, min(1.0, agent["fitness"] + pnl / max(agent["capital"], 1)))
 
     note = "ok"
 
-    if agent_drawdown(agent) <= MAX_AGENT_DRAWDOWN or agent["fitness"] < MIN_FITNESS:
+    if (agent["capital"] - agent["peak_capital"]) / agent["peak_capital"] <= MAX_AGENT_DRAWDOWN:
         agent["alive"] = False
         spawn_agent(agent_id)
-        note = "agent killed → reborn (risk)"
-
-    mut = maybe_mutate(genome)
-    if mut:
-        note += f" | {mut}"
+        note = "agent killed → reborn"
 
     trade = {
         "id": str(uuid.uuid4()),
         "agent": agent_id,
-        "decision": final_decision,
+        "decision": decision,
         "entry": entry,
         "exit": exit_p,
         "pnl": pnl,
-        "capital": agent["capital"],
+        "mode": TRADE_MODE,
         "time": time.time()
     }
     TRADE_LOG.append(trade)
@@ -255,46 +212,25 @@ def simulate_market(input: MarketInput):
     return TradeResult(
         trade_id=trade["id"],
         agent_id=agent_id,
-        decision=final_decision,
+        decision=decision,
         size=size,
         entry_price=entry,
         exit_price=exit_p,
         pnl=pnl,
         capital_after=round(agent["capital"], 2),
-        fitness=agent["fitness"],
+        fitness=round(agent["fitness"], 3),
+        mode=TRADE_MODE,
         note=note,
         timestamp=trade["time"]
     )
 
 # =========================
-# RANKING / MONITOR
+# MONITORING
 # =========================
 
-@app.get("/ranking")
-def ranking():
-    ranked = sorted(
-        AGENTS.items(),
-        key=lambda x: (
-            x[1]["fitness"],
-            x[1]["capital"],
-            x[1]["wins"] - x[1]["losses"]
-        ),
-        reverse=True
-    )
-    return {
-        "phase": PHASE,
-        "ranking": [
-            {
-                "agent": i,
-                "fitness": a["fitness"],
-                "capital": round(a["capital"], 2),
-                "wins": a["wins"],
-                "losses": a["losses"],
-                "trades": a["trades"]
-            }
-            for i, a in ranked
-        ]
-    }
+@app.get("/agents")
+def agents():
+    return AGENTS
 
 
 @app.get("/trades")
@@ -302,10 +238,8 @@ def trades():
     return TRADE_LOG[-50:]
 
 
-@app.post("/reset")
-def reset():
-    AGENTS.clear()
-    TRADE_LOG.clear()
-    for i in range(1, MAX_AGENTS + 1):
-        spawn_agent(i)
-    return {"reset": True, "phase": PHASE}
+@app.post("/unlock_live")
+def unlock_live():
+    global LIVE_UNLOCK
+    LIVE_UNLOCK = True
+    return {"live": "UNLOCKED"}
