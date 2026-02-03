@@ -8,8 +8,8 @@ import uuid
 import copy
 
 app = FastAPI(
-    title="ClawBot Phase 41 – Risk Manager AI",
-    version="0.7.0"
+    title="ClawBot Phase 42 – Multi Market Darwinism",
+    version="0.8.0"
 )
 
 # =========================
@@ -27,19 +27,18 @@ app.add_middleware(
 # Models
 # =========================
 class MarketInput(BaseModel):
-    risk_level: str
-    trend: str
     volatility: str
     liquidity: str
+    momentum: float  # -1.0 ถึง +1.0
 
 # =========================
-# Global State
+# Global Config
 # =========================
-POPULATION_SIZE = 4
+POPULATION_SIZE = 5
 INITIAL_CAPITAL = 100_000.0
-MAX_DRAWDOWN = 0.30
+MAX_DRAWDOWN = 0.35
 CRITICAL_DRAWDOWN = 0.20
-HOF_LIMIT = 5
+HOF_LIMIT = 6
 
 GENERATION = 1
 AGENTS: Dict[str, dict] = {}
@@ -51,16 +50,20 @@ MEMORY: List[dict] = []
 # =========================
 def random_gene():
     return {
-        "aggression": round(random.uniform(0.0, 1.0), 2),
-        "risk_tolerance": round(random.uniform(0.0, 1.0), 2),
-        "reactivity": round(random.uniform(0.0, 1.0), 2),
-        "position_size": round(random.uniform(0.1, 1.0), 2)
+        "aggression": round(random.uniform(0, 1), 2),
+        "risk_tolerance": round(random.uniform(0, 1), 2),
+        "adaptability": round(random.uniform(0, 1), 2),
+        "position_size": round(random.uniform(0.1, 1.0), 2),
+        "trend_bias": random.choice(["bull", "bear", "neutral"])
     }
 
 def mutate_gene(g):
     g2 = copy.deepcopy(g)
-    k = random.choice(list(g2.keys()))
-    g2[k] = round(min(1.0, max(0.0, g2[k] + random.uniform(-0.2, 0.2))), 2)
+    key = random.choice(list(g2.keys()))
+    if isinstance(g2[key], float):
+        g2[key] = round(min(1.0, max(0.0, g2[key] + random.uniform(-0.2, 0.2))), 2)
+    elif isinstance(g2[key], str):
+        g2[key] = random.choice(["bull", "bear", "neutral"])
     return g2
 
 def crossover(g1, g2):
@@ -78,9 +81,7 @@ def spawn_agent(parent_gene=None):
         "gene": gene,
         "capital": INITIAL_CAPITAL,
         "peak": INITIAL_CAPITAL,
-        "pnl": 0.0,
         "alive": True,
-        "risk_blocked": False,
         "born_gen": GENERATION
     }
 
@@ -88,60 +89,65 @@ for _ in range(POPULATION_SIZE):
     spawn_agent()
 
 # =========================
+# Market Regime Detector
+# =========================
+def detect_regime(market: MarketInput):
+    if market.momentum > 0.4:
+        return "BULL"
+    if market.momentum < -0.4:
+        return "BEAR"
+    return "SIDEWAYS"
+
+# =========================
 # Decision Engine
 # =========================
-def decide(agent, market: MarketInput):
-    g = agent["gene"]
-    danger = 1 if market.risk_level == "high" else 0
-    trend = 1 if market.trend == "up" else -1 if market.trend == "down" else 0
+def decide(agent, regime):
+    bias = agent["gene"]["trend_bias"]
+    adapt = agent["gene"]["adaptability"]
 
-    score = (
-        g["aggression"] * trend +
-        g["reactivity"] * trend -
-        danger * (1 - g["risk_tolerance"])
-    )
-
-    if score > 0.4:
-        return "LONG"
-    if score < -0.4:
-        return "SHORT"
-    return "FLAT"
+    if bias.upper() == regime:
+        return "TRADE"
+    if adapt > 0.7:
+        return "ADAPT"
+    return "HOLD"
 
 # =========================
-# Market Return
+# Market Return Engine
 # =========================
-def market_return(decision, market):
+def market_return(regime, decision):
     base = random.uniform(-0.01, 0.01)
 
-    if decision == "LONG" and market.trend == "up":
-        return abs(base) + 0.01
-    if decision == "SHORT" and market.trend == "down":
-        return abs(base) + 0.008
-    if decision in ["LONG", "SHORT"] and market.trend == "flat":
+    if decision == "TRADE":
+        if regime == "BULL":
+            return abs(base) + 0.015
+        if regime == "BEAR":
+            return abs(base) + 0.012
         return base * 0.4
 
-    return -abs(base) * 1.2
+    if decision == "ADAPT":
+        return base * 0.3
+
+    return -abs(base) * 0.6
 
 # =========================
-# Risk Manager Agent
+# Risk Manager
 # =========================
 def risk_manager(agent):
-    drawdown = 1 - (agent["capital"] / agent["peak"])
+    dd = 1 - (agent["capital"] / agent["peak"])
 
     action = "ALLOW"
 
-    if drawdown >= CRITICAL_DRAWDOWN:
+    if dd >= CRITICAL_DRAWDOWN:
         agent["gene"]["position_size"] = round(
             max(0.05, agent["gene"]["position_size"] * 0.5), 2
         )
-        action = "REDUCE_SIZE"
+        action = "REDUCE"
 
-    if drawdown >= MAX_DRAWDOWN:
+    if dd >= MAX_DRAWDOWN:
         agent["alive"] = False
-        agent["risk_blocked"] = True
-        action = "KILL_AGENT"
+        action = "KILL"
 
-    return action, round(drawdown, 3)
+    return action, round(dd, 3)
 
 # =========================
 # Capital Update
@@ -151,9 +157,7 @@ def apply_pnl(agent, ret):
     pnl = agent["capital"] * size * ret
 
     agent["capital"] += pnl
-    agent["pnl"] += pnl
     agent["peak"] = max(agent["peak"], agent["capital"])
-
     return pnl
 
 # =========================
@@ -186,10 +190,7 @@ def evolve():
 
     while len(AGENTS) < POPULATION_SIZE:
         g1 = champion["gene"]
-        g2 = random.choice(
-            [s["gene"] for s in survivors] +
-            [h["gene"] for h in HALL_OF_FAME]
-        )
+        g2 = random.choice([s["gene"] for s in survivors])
         spawn_agent(crossover(g1, g2))
 
 # =========================
@@ -198,31 +199,30 @@ def evolve():
 @app.get("/")
 def root():
     return {
-        "status": "ClawBot Phase 41 ONLINE",
+        "status": "ClawBot Phase 42 ONLINE",
         "generation": GENERATION,
         "agents": len(AGENTS),
-        "hof": len(HALL_OF_FAME),
         "timestamp": datetime.utcnow().isoformat()
     }
 
 @app.post("/simulate/market")
 def simulate(market: MarketInput):
+    regime = detect_regime(market)
     cycle = []
 
     for agent in AGENTS.values():
         if not agent["alive"]:
             continue
 
-        decision = decide(agent, market)
-        ret = market_return(decision, market)
+        decision = decide(agent, regime)
+        ret = market_return(regime, decision)
         pnl = apply_pnl(agent, ret)
-
         risk_action, dd = risk_manager(agent)
 
         cycle.append({
             "agent": agent["id"],
             "decision": decision,
-            "return": round(ret, 5),
+            "regime": regime,
             "pnl": round(pnl, 2),
             "capital": round(agent["capital"], 2),
             "drawdown": dd,
@@ -234,27 +234,28 @@ def simulate(market: MarketInput):
 
     MEMORY.append({
         "gen": GENERATION,
+        "regime": regime,
         "market": market.dict(),
-        "cycle": cycle,
-        "timestamp": datetime.utcnow().isoformat()
+        "cycle": cycle
     })
 
     return {
-        "phase": 41,
+        "phase": 42,
         "generation": GENERATION,
-        "cycle": cycle,
-        "agents_alive": len([a for a in AGENTS.values() if a["alive"]])
+        "regime": regime,
+        "agents_alive": len([a for a in AGENTS.values() if a["alive"]]),
+        "cycle": cycle
     }
 
 @app.get("/dashboard")
 def dashboard():
     return {
-        "phase": 41,
+        "phase": 42,
         "generation": GENERATION,
         "agents": list(AGENTS.values()),
         "hall_of_fame": HALL_OF_FAME,
         "memory": len(MEMORY),
-        "status": "RISK_MANAGED"
+        "status": "MULTI_MARKET_ACTIVE"
     }
 
 @app.post("/line/webhook")
