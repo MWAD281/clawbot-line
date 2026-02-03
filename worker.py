@@ -1,34 +1,43 @@
 """
 Clawbot Phase-96 Worker
-SAFE PRODUCTION MODE
-- No side effects on import
-- No auto-run AI
-- No network calls at startup
+SAFE PRODUCTION MODE + LOGIC X
 """
 
 import time
 import os
 import sys
 import traceback
+from datetime import datetime
 
 SERVICE_NAME = "clawbot-phase-96-worker"
 
 def boot_log(msg: str):
     print(f"[{SERVICE_NAME}] {msg}", flush=True)
 
+# ===== LOGIC X =====
+def logic_x():
+    """
+    LOGIC X (SAFE VERSION)
+    - No external API
+    - No AI calls
+    - No state mutation
+    """
+    now = datetime.utcnow().isoformat()
+    env = os.getenv("ENV", "production")
+
+    boot_log(f"LOGIC X EXECUTED | time={now} | env={env}")
+
+# ===================
+
 def main_loop():
     boot_log("MAIN LOOP STARTED")
 
     while True:
         try:
-            # ---- HEARTBEAT ONLY (SAFE) ----
-            boot_log("Worker alive")
+            boot_log("Worker heartbeat")
 
-            # TODO:
-            # - Put REAL logic here later
-            # - Queue polling
-            # - Cron-like task
-            # - AI execution step
+            # ---- RUN LOGIC X ----
+            logic_x()
 
             time.sleep(30)
 
