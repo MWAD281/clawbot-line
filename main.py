@@ -2,11 +2,13 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime
-from typing import List
+from typing import Dict, List
+import random
+import uuid
 
 app = FastAPI(
-    title="ClawBot Phase 36 – Multi-Agent Core",
-    version="0.2.0"
+    title="ClawBot Phase 37 – Darwinism Core",
+    version="0.3.0"
 )
 
 # =========================
@@ -21,23 +23,6 @@ app.add_middleware(
 )
 
 # =========================
-# Memory (in-memory)
-# =========================
-MEMORY: List[dict] = []
-
-# =========================
-# Root
-# =========================
-@app.get("/")
-def root():
-    return {
-        "status": "ClawBot Phase 36 ONLINE",
-        "agents": 3,
-        "memory_size": len(MEMORY),
-        "timestamp": datetime.utcnow().isoformat()
-    }
-
-# =========================
 # Models
 # =========================
 class MarketInput(BaseModel):
@@ -47,67 +32,124 @@ class MarketInput(BaseModel):
     liquidity: str
 
 # =========================
-# Agents
+# Agent Registry
 # =========================
-def risk_agent(data: MarketInput):
-    if data.risk_level == "high":
-        return ("DEFENSIVE", 0.8)
-    return ("HOLD", 0.5)
+AGENTS: Dict[str, dict] = {}
 
-def macro_agent(data: MarketInput):
-    if data.trend == "up":
-        return ("AGGRESSIVE", 0.7)
-    if data.trend == "down":
-        return ("DEFENSIVE", 0.6)
-    return ("HOLD", 0.5)
+def spawn_agent(role: str):
+    agent_id = str(uuid.uuid4())[:8]
+    AGENTS[agent_id] = {
+        "id": agent_id,
+        "role": role,
+        "score": 0.0,
+        "alive": True,
+        "created_at": datetime.utcnow().isoformat()
+    }
 
-def opportunist_agent(data: MarketInput):
-    if data.volatility == "extreme":
-        return ("AGGRESSIVE", 0.6)
-    return ("HOLD", 0.4)
-
-# =========================
-# Voting Engine
-# =========================
-def vote(decisions):
-    score = {}
-    for decision, confidence in decisions:
-        score[decision] = score.get(decision, 0) + confidence
-    final = max(score, key=score.get)
-    return final, score
+# Initial agents
+for role in ["Risk", "Macro", "Opportunist"]:
+    spawn_agent(role)
 
 # =========================
-# Simulation Endpoint
+# Memory
+# =========================
+MEMORY: List[dict] = []
+
+# =========================
+# Agent Logic
+# =========================
+def agent_decision(agent, data: MarketInput):
+    role = agent["role"]
+
+    if role == "Risk":
+        return "DEFENSIVE" if data.risk_level == "high" else "HOLD"
+
+    if role == "Macro":
+        if data.trend == "up":
+            return "AGGRESSIVE"
+        if data.trend == "down":
+            return "DEFENSIVE"
+        return "HOLD"
+
+    if role == "Opportunist":
+        return "AGGRESSIVE" if data.volatility in ["high", "extreme"] else "HOLD"
+
+    return "HOLD"
+
+# =========================
+# Scoring System
+# =========================
+def evaluate(decision: str, data: MarketInput):
+    # simple reward model (placeholder for real PnL)
+    if decision == "AGGRESSIVE" and data.trend == "up":
+        return +1.0
+    if decision == "DEFENSIVE" and data.trend == "down":
+        return +0.8
+    if decision == "AGGRESSIVE" and data.trend == "down":
+        return -1.2
+    return -0.2
+
+# =========================
+# Darwinism Engine
+# =========================
+def darwin_cycle():
+    dead = []
+    for agent_id, agent in AGENTS.items():
+        if agent["score"] < -3:
+            agent["alive"] = False
+            dead.append(agent_id)
+
+    for agent_id in dead:
+        del AGENTS[agent_id]
+        spawn_agent(random.choice(["Risk", "Macro", "Opportunist"]))
+
+# =========================
+# Root
+# =========================
+@app.get("/")
+def root():
+    return {
+        "status": "ClawBot Phase 37 ONLINE",
+        "agents_alive": len(AGENTS),
+        "memory_records": len(MEMORY),
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+# =========================
+# Simulation
 # =========================
 @app.post("/simulate/market")
 def simulate_market(data: MarketInput):
-    decisions = [
-        risk_agent(data),
-        macro_agent(data),
-        opportunist_agent(data),
-    ]
+    results = []
 
-    final_decision, score_table = vote(decisions)
+    for agent in AGENTS.values():
+        decision = agent_decision(agent, data)
+        reward = evaluate(decision, data)
+        agent["score"] += reward
+
+        results.append({
+            "agent_id": agent["id"],
+            "role": agent["role"],
+            "decision": decision,
+            "reward": reward,
+            "score": agent["score"]
+        })
+
+    darwin_cycle()
 
     record = {
         "input": data.dict(),
-        "agents": decisions,
-        "final_decision": final_decision,
-        "scores": score_table,
+        "results": results,
+        "agents_alive": len(AGENTS),
         "timestamp": datetime.utcnow().isoformat()
     }
 
     MEMORY.append(record)
 
     return {
-        "decision": final_decision,
-        "scores": score_table,
-        "agents": [
-            {"name": "RiskAgent", "vote": decisions[0][0]},
-            {"name": "MacroAgent", "vote": decisions[1][0]},
-            {"name": "OpportunistAgent", "vote": decisions[2][0]},
-        ],
-        "engine": "ClawBot Phase 36"
+        "engine": "ClawBot Phase 37",
+        "cycle_result": results,
+        "agents_alive": len(AGENTS)
     }
 
 # =========================
@@ -116,19 +158,17 @@ def simulate_market(data: MarketInput):
 @app.get("/dashboard")
 def dashboard():
     return {
-        "system": "ClawBot",
-        "phase": 36,
-        "agents": ["RiskAgent", "MacroAgent", "OpportunistAgent"],
-        "memory_records": len(MEMORY),
-        "last_decision": MEMORY[-1] if MEMORY else None,
-        "status": "ONLINE",
+        "phase": 37,
+        "agents": list(AGENTS.values()),
+        "memory_size": len(MEMORY),
+        "last_cycle": MEMORY[-1] if MEMORY else None,
+        "status": "EVOLVING",
         "timestamp": datetime.utcnow().isoformat()
     }
 
 # =========================
-# LINE Webhook (stub)
+# LINE Webhook Stub
 # =========================
 @app.post("/line/webhook")
 async def line_webhook(request: Request):
-    body = await request.json()
     return {"ok": True}
