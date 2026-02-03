@@ -4,8 +4,8 @@ from memory.judgment_state import get_judgment, overwrite_judgment
 from agents.ceo_council import run_ceo_council, adjust_ceo_fitness
 
 
-def evolve_from_council(ai_raw: dict) -> dict:
-    opinions = run_ceo_council(ai_raw)
+def evolve_from_council(ai_text: str) -> dict:
+    opinions = run_ceo_council(ai_text)
 
     if not opinions:
         return get_judgment()
