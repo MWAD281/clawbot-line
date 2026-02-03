@@ -11,6 +11,7 @@ from agents.finance_agents import run_finance_swarm
 from memory.judgment_state import get_judgment, overwrite_judgment
 from evolution.judgment_evolver import evolve_from_ai
 from world.routes import router as world_router
+from evolution.council_evolver import evolve_from_council
 
 
 # =========================
@@ -138,7 +139,7 @@ async def line_webhook(request: Request):
         # =========================
         try:
             if isinstance(ai_raw, dict):
-                evolve_from_ai(get_judgment(), ai_raw)
+                evolve_from_council(ai_raw)
         except Exception as e:
             print("EVOLVE ERROR:", e)
 
