@@ -4,6 +4,7 @@ import hashlib
 import base64
 import requests
 import time
+from typing import Optional
 
 from fastapi import FastAPI, Request, HTTPException
 
@@ -21,8 +22,9 @@ from market.feedback_loop import run_market_feedback_loop
 app = FastAPI()
 app.include_router(world_router)
 
-LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
-LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
+LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "")
+LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply"
 OPENAI_URL = "https://api.openai.com/v1/responses"
@@ -90,7 +92,10 @@ def build_system_prompt(mode: str) -> str:
 @app.post("/line/webhook")
 async def line_webhook(request: Request):
     body = await request.body()
-    x_line_signature = request.headers.get("X-Line-Signature")
+    x_line_signature = request.headers.get("X-Line-Signature", "")
+
+    if not LINE_CHANNEL_SECRET:
+        raise HTTPException(status_code=500, detail="LINE_CHANNEL_SECRET not set")
 
     # verify signature
     hash_value = hmac.new(
@@ -103,15 +108,19 @@ async def line_webhook(request: Request):
     if not hmac.compare_digest(signature, x_line_signature):
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-    data = await request.json()
+    try:
+        data = await request.json()
+    except Exception:
+        return {"ok": False, "error": "Invalid JSON"}
 
     for event in data.get("events", []):
         if event.get("type") != "message":
             continue
 
-        reply_token = event["replyToken"]
-        user_text = event["message"].get("text", "").strip()
-        if not user_text:
+        reply_token = event.get("replyToken")
+        user_text = event.get("message", {}).get("text", "").strip()
+
+        if not reply_token or not user_text:
             continue
 
         mode = detect_mode(user_text)
@@ -157,8 +166,11 @@ async def line_webhook(request: Request):
 # =========================
 
 def call_openai(user_text: str, mode: str) -> dict:
+    if not OPENAI_API_KEY:
+        raise RuntimeError("OPENAI_API_KEY not set")
+
     headers = {
-        "Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}",
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
         "Content-Type": "application/json"
     }
 
@@ -216,17 +228,24 @@ def reply_line(reply_token: str, text: str):
 
 
 # =========================
-# MARKET SIMULATION (แทน Shell)
+# MARKET SIMULATION API
 # =========================
 
 @app.post("/simulate/market")
-def simulate_market():
+def simulate_market(
+    risk_level: Optional[str] = "high",
+    trend: Optional[str] = "down",
+    volatility: Optional[str] = "extreme",
+    liquidity: Optional[str] = "tight"
+):
     market_state = {
-        "risk_level": "high",
-        "trend": "down",
-        "volatility": "extreme",
-        "liquidity": "tight"
+        "risk_level": risk_level,
+        "trend": trend,
+        "volatility": volatility,
+        "liquidity": liquidity
     }
+
+    print("SIMULATE MARKET:", market_state)
 
     result = run_market_feedback_loop(market_state)
 
