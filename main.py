@@ -2,15 +2,15 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List
 import random
 import uuid
 import copy
 import math
 
 app = FastAPI(
-    title="ClawBot Phase 43 – Paper Trading Engine",
-    version="0.9.0"
+    title="ClawBot Phase 44 – Memory Weighted Strategy",
+    version="1.0.0"
 )
 
 # =========================
@@ -28,10 +28,10 @@ app.add_middleware(
 # Models
 # =========================
 class MarketInput(BaseModel):
-    volatility: str            # normal | high | extreme
-    liquidity: str             # loose | normal | tight
-    momentum: float            # -1.0 .. +1.0
-    price: float               # synthetic price feed
+    volatility: str      # normal | high | extreme
+    liquidity: str       # loose | normal | tight
+    momentum: float      # -1.0 .. +1.0
+    price: float
 
 # =========================
 # Global Config
@@ -42,12 +42,12 @@ MAX_DRAWDOWN = 0.35
 CRITICAL_DRAWDOWN = 0.20
 TAKER_FEE = 0.0006
 SLIPPAGE_BASE = 0.0005
+MEMORY_LIMIT = 30
 HOF_LIMIT = 8
 
 GENERATION = 1
 AGENTS: Dict[str, dict] = {}
 HALL_OF_FAME: List[dict] = []
-AUDIT_LOG: List[dict] = []
 
 # =========================
 # Genetics
@@ -86,7 +86,8 @@ def spawn_agent(parent_gene=None):
         "equity": INITIAL_CAPITAL,
         "peak": INITIAL_CAPITAL,
         "alive": True,
-        "position": None,   # {side, entry, size}
+        "position": None,
+        "memory": [],
         "born_gen": GENERATION
     }
 
@@ -104,16 +105,51 @@ def detect_regime(m: MarketInput):
     return "SIDEWAYS"
 
 # =========================
+# Memory Engine
+# =========================
+def similarity(a, b):
+    score = 0
+    if a["regime"] == b["regime"]:
+        score += 0.5
+    score += max(0, 0.5 - abs(a["momentum"] - b["momentum"]))
+    return score
+
+def memory_bias(agent, snapshot):
+    memories = agent["memory"]
+    if not memories:
+        return 0
+
+    weighted = []
+    for m in memories:
+        sim = similarity(snapshot, m)
+        weighted.append(sim * m["pnl"])
+
+    return sum(weighted) / max(1, len(weighted))
+
+# =========================
 # Decision Engine
 # =========================
-def decide(agent, regime):
-    bias = agent["gene"]["trend_bias"].upper()
-    adapt = agent["gene"]["adaptability"]
+def decide(agent, market: MarketInput, regime):
+    snapshot = {
+        "regime": regime,
+        "momentum": market.momentum
+    }
 
-    if bias == regime:
+    mem_score = memory_bias(agent, snapshot)
+    adapt = agent["gene"]["adaptability"]
+    bias = agent["gene"]["trend_bias"].upper()
+
+    if mem_score > 0.02:
         return "ENTER"
+    if mem_score < -0.02:
+        return "HOLD"
+
+    if bias == regime and adapt > 0.4:
+        return "ENTER"
+
     if adapt > 0.7:
         return "SCALP"
+
     return "HOLD"
 
 # =========================
@@ -139,20 +175,27 @@ def open_position(agent, side, price, size, market):
         "entry": fill,
         "size": size
     }
-    return fill, fee
 
-def close_position(agent, price, market):
+def close_position(agent, price, market, regime, momentum):
     pos = agent["position"]
     slip = slippage(market)
     exit_price = price * (1 - slip if pos["side"] == "LONG" else 1 + slip)
-    pnl = (exit_price - pos["entry"]) / pos["entry"]
+    pnl_ratio = (exit_price - pos["entry"]) / pos["entry"]
     if pos["side"] == "SHORT":
-        pnl = -pnl
-    gross = agent["capital"] * pos["size"] * pnl
+        pnl_ratio = -pnl_ratio
+
+    gross = agent["capital"] * pos["size"] * pnl_ratio
     fee = abs(gross) * TAKER_FEE
-    agent["capital"] += gross - fee
+    net = gross - fee
+    agent["capital"] += net
     agent["position"] = None
-    return gross - fee
+
+    agent["memory"].append({
+        "regime": regime,
+        "momentum": momentum,
+        "pnl": pnl_ratio
+    })
+    agent["memory"] = agent["memory"][-MEMORY_LIMIT:]
 
 # =========================
 # Risk Manager
@@ -164,13 +207,13 @@ def risk_manager(agent):
 
     if dd >= MAX_DRAWDOWN:
         agent["alive"] = False
-        return "KILL", round(dd, 3)
+        return "KILL"
 
     if dd >= CRITICAL_DRAWDOWN and agent["position"]:
         agent["position"]["size"] *= 0.5
-        return "REDUCE", round(dd, 3)
+        return "REDUCE"
 
-    return "OK", round(dd, 3)
+    return "OK"
 
 # =========================
 # Evolution
@@ -210,73 +253,48 @@ def evolve():
 @app.get("/")
 def root():
     return {
-        "status": "ClawBot Phase 43 ONLINE",
+        "status": "ClawBot Phase 44 ONLINE",
         "generation": GENERATION,
-        "agents": len(AGENTS),
-        "timestamp": datetime.utcnow().isoformat()
+        "agents": len(AGENTS)
     }
 
 @app.post("/simulate/market")
 def simulate(market: MarketInput):
     regime = detect_regime(market)
-    cycle = []
 
     for agent in AGENTS.values():
         if not agent["alive"]:
             continue
 
-        decision = decide(agent, regime)
+        decision = decide(agent, market, regime)
 
-        # Exit logic
-        if agent["position"] and decision in ["HOLD", "SCALP"]:
-            pnl = close_position(agent, market.price, market)
-        else:
-            pnl = 0.0
+        if agent["position"]:
+            close_position(agent, market.price, market, regime, market.momentum)
 
-        # Entry logic
-        if not agent["position"] and decision in ["ENTER", "SCALP"]:
+        if decision in ["ENTER", "SCALP"]:
             side = "LONG" if regime == "BULL" else "SHORT"
             size = position_size(agent, regime)
-            fill, fee = open_position(agent, side, market.price, size, market)
+            open_position(agent, side, market.price, size, market)
 
-        risk_action, dd = risk_manager(agent)
-
-        cycle.append({
-            "agent": agent["id"],
-            "decision": decision,
-            "regime": regime,
-            "capital": round(agent["capital"], 2),
-            "drawdown": dd,
-            "risk": risk_action,
-            "alive": agent["alive"]
-        })
-
-        AUDIT_LOG.append({
-            "time": datetime.utcnow().isoformat(),
-            "agent": agent["id"],
-            "decision": decision,
-            "capital": agent["capital"]
-        })
+        risk_manager(agent)
 
     evolve()
 
     return {
-        "phase": 43,
+        "phase": 44,
         "generation": GENERATION,
         "regime": regime,
-        "agents_alive": len([a for a in AGENTS.values() if a["alive"]]),
-        "cycle": cycle
+        "agents_alive": len([a for a in AGENTS.values() if a["alive"]])
     }
 
 @app.get("/dashboard")
 def dashboard():
     return {
-        "phase": 43,
+        "phase": 44,
         "generation": GENERATION,
         "agents": list(AGENTS.values()),
         "hall_of_fame": HALL_OF_FAME,
-        "audit_logs": len(AUDIT_LOG),
-        "status": "PAPER_TRADING_ACTIVE"
+        "status": "MEMORY_WEIGHTED_ACTIVE"
     }
 
 @app.post("/line/webhook")
