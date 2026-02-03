@@ -12,3 +12,4 @@ def get_market_snapshot():
         "trend": random.choice(["up", "down", "sideways"]),
         "liquidity": random.uniform(0.3, 1.0),
     }
+
