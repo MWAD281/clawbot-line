@@ -1,108 +1,15 @@
-from fastapi import FastAPI, Request, Header, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-import httpx
-import os
-import time
-import random
-import uuid
-import hashlib
-import hmac
-import base64
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from datetime import datetime
 
-# =========================
-# BASIC APP
-# =========================
-app = FastAPI(title="ClawBot Phase 35 – LINE Bridge")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+app = FastAPI(
+    title="ClawBot Phase 35 – LINE Bridge",
+    version="0.1.0"
 )
 
-LINE_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
-LINE_SECRET = os.getenv("LINE_CHANNEL_SECRET")
-
-LINE_REPLY_API = "https://api.line.me/v2/bot/message/reply"
-
 # =========================
-# SIMPLE BRAIN (Stub)
-# ต่อ Darwinism ทีหลังได้
-# =========================
-def clawbot_brain(text: str) -> str:
-    text = text.lower()
-
-    if "สงคราม" in text:
-        return "⚠️ ความเสี่ยงโลกสูงขึ้น ควรลด leverage และเพิ่มสินทรัพย์ปลอดภัย"
-
-    if "ทดสอบ" in text:
-        return "✅ ClawBot ONLINE พร้อมรบ"
-
-    return "🧠 ClawBot รับข้อมูลแล้ว กำลังประเมินความเสี่ยงเชิงกลยุทธ์"
-
-# =========================
-# LINE SIGNATURE VERIFY
-# =========================
-def verify_signature(body: bytes, signature: str):
-    hash = hmac.new(
-        LINE_SECRET.encode("utf-8"),
-        body,
-        hashlib.sha256
-    ).digest()
-    expected = base64.b64encode(hash).decode()
-    return hmac.compare_digest(expected, signature)
-
-# =========================
-# LINE WEBHOOK
-# =========================
-@app.post("/line/webhook")
-async def line_webhook(
-    request: Request,
-    x_line_signature: str = Header(None)
-):
-    body = await request.body()
-
-    if not verify_signature(body, x_line_signature):
-        raise HTTPException(status_code=403, detail="Invalid signature")
-
-    payload = await request.json()
-    events = payload.get("events", [])
-
-    async with httpx.AsyncClient(timeout=5) as client:
-        for event in events:
-            if event["type"] != "message":
-                continue
-
-            if event["message"]["type"] != "text":
-                continue
-
-            reply_token = event["replyToken"]
-            user_text = event["message"]["text"]
-
-            reply_text = clawbot_brain(user_text)
-
-            await client.post(
-                LINE_REPLY_API,
-                headers={
-                    "Authorization": f"Bearer {LINE_TOKEN}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "replyToken": reply_token,
-                    "messages": [
-                        {
-                            "type": "text",
-                            "text": reply_text
-                        }
-                    ]
-                }
-            )
-
-    return {"status": "ok"}
-
-# =========================
-# HEALTH CHECK
+# Root
 # =========================
 @app.get("/")
 def root():
@@ -111,5 +18,54 @@ def root():
         "epoch": 0,
         "generation": 1,
         "pressure": 1.0,
-        "deception": 0.0
+        "deception": 0.0,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+# =========================
+# LINE Webhook (placeholder)
+# =========================
+@app.post("/line/webhook")
+async def line_webhook(request: Request):
+    body = await request.json()
+    return {"ok": True}
+
+# =========================
+# Market Simulation
+# =========================
+class MarketInput(BaseModel):
+    risk_level: str
+    trend: str
+    volatility: str
+    liquidity: str
+
+@app.post("/simulate/market")
+def simulate_market(data: MarketInput):
+    decision = "HOLD"
+
+    if data.risk_level == "high" and data.trend == "down":
+        decision = "DEFENSIVE"
+    elif data.risk_level == "low" and data.trend == "up":
+        decision = "AGGRESSIVE"
+
+    return {
+        "input": data.dict(),
+        "decision": decision,
+        "confidence": 0.72,
+        "engine": "ClawBot Phase 35",
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+# =========================
+# Dashboard (JSON version)
+# =========================
+@app.get("/dashboard")
+def dashboard():
+    return {
+        "system": "ClawBot",
+        "phase": 35,
+        "status": "ONLINE",
+        "agents": 1,
+        "uptime": "stable",
+        "last_check": datetime.utcnow().isoformat()
     }
