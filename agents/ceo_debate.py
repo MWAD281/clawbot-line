@@ -1,44 +1,31 @@
 # agents/ceo_debate.py
 
-def ceo_debate(ai_text: str, name: str, profile: dict) -> dict:
-    """
-    ให้ CEO แสดงความเห็นเป็นภาษา (เหตุผล)
-    """
-    bias = profile.get("bias", "neutral")
+from memory.strategy_memory import get_strategy_bias
+import random
 
-    if bias == "risk_downside":
-        opinion = (
-            f"{name}: มุมมองนี้มี downside risk สูง "
-            "ควรระวัง tail risk และ systemic shock"
-        )
-        score = -0.5
-        risk = 0.7
 
-    elif bias == "growth_upside":
-        opinion = (
-            f"{name}: เห็น opportunity เชิงโครงสร้าง "
-            "risk อยู่ในระดับรับได้"
-        )
-        score = 0.6
-        risk = 0.4
+def ceo_debate(ai_text: str, ceo_name: str, profile: dict) -> dict:
+    bias = profile["bias"]
 
-    elif bias == "systemic_risk":
-        opinion = (
-            f"{name}: โครงสร้างระบบเปราะบาง "
-            "liquidity และ feedback loop น่ากังวล"
-        )
-        score = -0.7
-        risk = 0.8
+    base_score = random.uniform(-1, 1)
+    risk = random.uniform(0.2, 0.8)
 
-    else:
-        opinion = f"{name}: ยังไม่เห็น signal ชัด"
-        score = 0.0
-        risk = 0.5
+    stance = "WAIT"
+    if base_score > 0.3:
+        stance = "RISK_ON"
+    elif base_score < -0.3:
+        stance = "RISK_OFF"
+
+    # memory influence
+    regime = profile.get("last_regime", "NEUTRAL")
+    memory_bias = get_strategy_bias(stance, regime)
+
+    final_score = base_score + memory_bias * 0.5
 
     return {
-        "ceo": name,
-        "opinion": opinion,
-        "score": score,
+        "ceo": ceo_name,
+        "stance": stance,
+        "score": final_score,
         "global_risk": risk,
-        "weight": profile.get("weight", 1.0)
+        "weight": profile["weight"]
     }
