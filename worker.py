@@ -1,6 +1,7 @@
 """
 Clawbot Phase-96 Worker
-SAFE PRODUCTION MODE + LOGIC X
+SAFE PRODUCTION MODE
+Logic X: Passive Heartbeat + Self-Health Guard
 """
 
 import time
@@ -10,47 +11,41 @@ import traceback
 from datetime import datetime
 
 SERVICE_NAME = "clawbot-phase-96-worker"
+SLEEP_SECONDS = 30
 
-def boot_log(msg: str):
+def log(msg: str):
     print(f"[{SERVICE_NAME}] {msg}", flush=True)
 
-# ===== LOGIC X =====
+# ===== LOGIC X (SAFE, READ-ONLY) =====
 def logic_x():
     """
-    LOGIC X (SAFE VERSION)
+    SAFE LOGIC X
     - No external API
-    - No AI calls
-    - No state mutation
+    - No DB
+    - No mutation
+    - Only observability
     """
     now = datetime.utcnow().isoformat()
+    pid = os.getpid()
     env = os.getenv("ENV", "production")
 
-    boot_log(f"LOGIC X EXECUTED | time={now} | env={env}")
+    log(f"LOGIC_X_OK | time={now} | pid={pid} | env={env}")
+# ====================================
 
-# ===================
-
-def main_loop():
-    boot_log("MAIN LOOP STARTED")
+def main():
+    log("BOOT")
+    log(f"Python={sys.version}")
 
     while True:
         try:
-            boot_log("Worker heartbeat")
-
-            # ---- RUN LOGIC X ----
             logic_x()
-
-            time.sleep(30)
+            time.sleep(SLEEP_SECONDS)
 
         except Exception as e:
-            boot_log("ERROR in main loop")
-            boot_log(str(e))
+            log("ERROR_CAUGHT")
+            log(str(e))
             traceback.print_exc()
-            time.sleep(5)  # prevent crash loop
-
+            time.sleep(5)  # anti-crash loop
 
 if __name__ == "__main__":
-    boot_log("BOOT OK")
-    boot_log(f"Python: {sys.version}")
-    boot_log(f"PID: {os.getpid()}")
-
-    main_loop()
+    main()
