@@ -11,6 +11,7 @@ from agents.finance_agents import run_finance_swarm
 from memory.judgment_state import get_judgment, overwrite_judgment
 from world.routes import router as world_router
 from evolution.council_evolver import evolve_from_council
+from market.feedback_loop import run_market_feedback_loop
 
 
 # =========================
@@ -110,12 +111,10 @@ async def line_webhook(request: Request):
 
         reply_token = event["replyToken"]
         user_text = event["message"].get("text", "").strip()
-
         if not user_text:
             continue
 
         mode = detect_mode(user_text)
-        start_time = time.time()
 
         # =========================
         # CALL AI (SAFE)
@@ -143,7 +142,7 @@ async def line_webhook(request: Request):
             print("EVOLVE ERROR:", e)
 
         # =========================
-        # REPLY LINE (FAIL-SAFE)
+        # REPLY LINE
         # =========================
         try:
             reply_line(reply_token, ai_text)
@@ -217,6 +216,28 @@ def reply_line(reply_token: str, text: str):
 
 
 # =========================
+# MARKET SIMULATION (แทน Shell)
+# =========================
+
+@app.post("/simulate/market")
+def simulate_market():
+    market_state = {
+        "risk_level": "high",
+        "trend": "down",
+        "volatility": "extreme",
+        "liquidity": "tight"
+    }
+
+    result = run_market_feedback_loop(market_state)
+
+    return {
+        "status": "SIMULATION_COMPLETE",
+        "market_state": market_state,
+        "result": result
+    }
+
+
+# =========================
 # HEALTH / WORLD
 # =========================
 
@@ -227,7 +248,6 @@ def health_check():
 @app.get("/world")
 def world_state():
     return get_judgment()
-
 
 @app.post("/world/fear")
 def inject_prebirth_fear():
