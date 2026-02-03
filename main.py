@@ -1,15 +1,14 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from datetime import datetime
 from typing import Dict, List
 import random
 import uuid
 import copy
-import math
+import statistics
 
 app = FastAPI(
-    title="ClawBot Phase 44 – Memory Weighted Strategy",
+    title="ClawBot Phase 45 – Capital Allocator",
     version="1.0.0"
 )
 
@@ -28,16 +27,17 @@ app.add_middleware(
 # Models
 # =========================
 class MarketInput(BaseModel):
-    volatility: str      # normal | high | extreme
-    liquidity: str       # loose | normal | tight
-    momentum: float      # -1.0 .. +1.0
+    volatility: str
+    liquidity: str
+    momentum: float
     price: float
 
 # =========================
-# Global Config
+# Config
 # =========================
 POPULATION_SIZE = 6
-INITIAL_CAPITAL = 100_000.0
+TOTAL_CAPITAL = 600_000.0
+BASE_CAPITAL = TOTAL_CAPITAL / POPULATION_SIZE
 MAX_DRAWDOWN = 0.35
 CRITICAL_DRAWDOWN = 0.20
 TAKER_FEE = 0.0006
@@ -76,18 +76,19 @@ def crossover(g1, g2):
 # =========================
 # Agent Factory
 # =========================
-def spawn_agent(parent_gene=None):
+def spawn_agent(parent_gene=None, capital=BASE_CAPITAL):
     aid = str(uuid.uuid4())[:8]
     gene = mutate_gene(parent_gene) if parent_gene else random_gene()
     AGENTS[aid] = {
         "id": aid,
         "gene": gene,
-        "capital": INITIAL_CAPITAL,
-        "equity": INITIAL_CAPITAL,
-        "peak": INITIAL_CAPITAL,
+        "capital": capital,
+        "equity": capital,
+        "peak": capital,
         "alive": True,
         "position": None,
         "memory": [],
+        "returns": [],
         "born_gen": GENERATION
     }
 
@@ -95,7 +96,7 @@ for _ in range(POPULATION_SIZE):
     spawn_agent()
 
 # =========================
-# Market Regime
+# Market
 # =========================
 def detect_regime(m: MarketInput):
     if m.momentum > 0.4:
@@ -115,49 +116,39 @@ def similarity(a, b):
     return score
 
 def memory_bias(agent, snapshot):
-    memories = agent["memory"]
-    if not memories:
+    if not agent["memory"]:
         return 0
-
-    weighted = []
-    for m in memories:
-        sim = similarity(snapshot, m)
-        weighted.append(sim * m["pnl"])
-
-    return sum(weighted) / max(1, len(weighted))
+    weighted = [
+        similarity(snapshot, m) * m["pnl"]
+        for m in agent["memory"]
+    ]
+    return sum(weighted) / len(weighted)
 
 # =========================
 # Decision Engine
 # =========================
-def decide(agent, market: MarketInput, regime):
-    snapshot = {
-        "regime": regime,
-        "momentum": market.momentum
-    }
-
-    mem_score = memory_bias(agent, snapshot)
+def decide(agent, market, regime):
+    snapshot = {"regime": regime, "momentum": market.momentum}
+    mem = memory_bias(agent, snapshot)
     adapt = agent["gene"]["adaptability"]
     bias = agent["gene"]["trend_bias"].upper()
 
-    if mem_score > 0.02:
+    if mem > 0.02:
         return "ENTER"
-    if mem_score < -0.02:
+    if mem < -0.02:
         return "HOLD"
 
     if bias == regime and adapt > 0.4:
         return "ENTER"
-
     if adapt > 0.7:
         return "SCALP"
-
     return "HOLD"
 
 # =========================
-# Execution Engine
+# Execution
 # =========================
-def slippage(market: MarketInput):
-    mult = {"loose": 0.8, "normal": 1.0, "tight": 1.6}[market.liquidity]
-    return SLIPPAGE_BASE * mult
+def slippage(market):
+    return SLIPPAGE_BASE * {"loose": 0.8, "normal": 1.0, "tight": 1.6}[market.liquidity]
 
 def position_size(agent, regime):
     base = agent["gene"]["base_position"]
@@ -166,29 +157,23 @@ def position_size(agent, regime):
     return max(0.01, min(0.7, base * risk * adj))
 
 def open_position(agent, side, price, size, market):
-    slip = slippage(market)
-    fill = price * (1 + slip if side == "LONG" else 1 - slip)
+    fill = price * (1 + slippage(market) if side == "LONG" else 1 - slippage(market))
     fee = agent["capital"] * size * TAKER_FEE
     agent["capital"] -= fee
-    agent["position"] = {
-        "side": side,
-        "entry": fill,
-        "size": size
-    }
+    agent["position"] = {"side": side, "entry": fill, "size": size}
 
 def close_position(agent, price, market, regime, momentum):
     pos = agent["position"]
-    slip = slippage(market)
-    exit_price = price * (1 - slip if pos["side"] == "LONG" else 1 + slip)
+    exit_price = price * (1 - slippage(market) if pos["side"] == "LONG" else 1 + slippage(market))
     pnl_ratio = (exit_price - pos["entry"]) / pos["entry"]
     if pos["side"] == "SHORT":
         pnl_ratio = -pnl_ratio
 
-    gross = agent["capital"] * pos["size"] * pnl_ratio
-    fee = abs(gross) * TAKER_FEE
-    net = gross - fee
+    pnl = agent["capital"] * pos["size"] * pnl_ratio
+    fee = abs(pnl) * TAKER_FEE
+    net = pnl - fee
     agent["capital"] += net
-    agent["position"] = None
+    agent["returns"].append(pnl_ratio)
 
     agent["memory"].append({
         "regime": regime,
@@ -196,24 +181,42 @@ def close_position(agent, price, market, regime, momentum):
         "pnl": pnl_ratio
     })
     agent["memory"] = agent["memory"][-MEMORY_LIMIT:]
+    agent["position"] = None
 
 # =========================
-# Risk Manager
+# Risk
 # =========================
-def risk_manager(agent):
+def risk(agent):
     agent["equity"] = agent["capital"]
     agent["peak"] = max(agent["peak"], agent["equity"])
     dd = 1 - agent["equity"] / agent["peak"]
 
     if dd >= MAX_DRAWDOWN:
         agent["alive"] = False
-        return "KILL"
-
-    if dd >= CRITICAL_DRAWDOWN and agent["position"]:
+    elif dd >= CRITICAL_DRAWDOWN and agent["position"]:
         agent["position"]["size"] *= 0.5
-        return "REDUCE"
 
-    return "OK"
+# =========================
+# Capital Allocator
+# =========================
+def score_agent(agent):
+    if len(agent["returns"]) < 3:
+        return 0
+    avg = statistics.mean(agent["returns"])
+    vol = statistics.stdev(agent["returns"]) if len(agent["returns"]) > 1 else 0.01
+    return avg / max(0.01, vol)
+
+def allocate_capital():
+    alive = [a for a in AGENTS.values() if a["alive"]]
+    if not alive:
+        return
+
+    scores = {a["id"]: max(0, score_agent(a)) for a in alive}
+    total_score = sum(scores.values()) or 1
+
+    for a in alive:
+        target = TOTAL_CAPITAL * (scores[a["id"]] / total_score)
+        a["capital"] = max(10_000, target)
 
 # =========================
 # Evolution
@@ -253,7 +256,7 @@ def evolve():
 @app.get("/")
 def root():
     return {
-        "status": "ClawBot Phase 44 ONLINE",
+        "status": "ClawBot Phase 45 ONLINE",
         "generation": GENERATION,
         "agents": len(AGENTS)
     }
@@ -262,7 +265,7 @@ def root():
 def simulate(market: MarketInput):
     regime = detect_regime(market)
 
-    for agent in AGENTS.values():
+    for agent in list(AGENTS.values()):
         if not agent["alive"]:
             continue
 
@@ -273,15 +276,15 @@ def simulate(market: MarketInput):
 
         if decision in ["ENTER", "SCALP"]:
             side = "LONG" if regime == "BULL" else "SHORT"
-            size = position_size(agent, regime)
-            open_position(agent, side, market.price, size, market)
+            open_position(agent, side, market.price, position_size(agent, regime), market)
 
-        risk_manager(agent)
+        risk(agent)
 
+    allocate_capital()
     evolve()
 
     return {
-        "phase": 44,
+        "phase": 45,
         "generation": GENERATION,
         "regime": regime,
         "agents_alive": len([a for a in AGENTS.values() if a["alive"]])
@@ -290,11 +293,11 @@ def simulate(market: MarketInput):
 @app.get("/dashboard")
 def dashboard():
     return {
-        "phase": 44,
+        "phase": 45,
         "generation": GENERATION,
         "agents": list(AGENTS.values()),
         "hall_of_fame": HALL_OF_FAME,
-        "status": "MEMORY_WEIGHTED_ACTIVE"
+        "allocator": "ACTIVE"
     }
 
 @app.post("/line/webhook")
