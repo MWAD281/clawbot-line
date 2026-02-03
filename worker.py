@@ -1,63 +1,35 @@
 import time
-import random
 import logging
+import random
+import sys
 
-logging.basicConfig(level=logging.INFO)
-
-# ===== Strategy =====
-
-class Strategy:
-    def __init__(self, name):
-        self.name = name
-        self.score = 0
-
-    def run(self):
-        # จำลอง performance
-        self.score += random.uniform(-1, 2)
-        return self.score
-
-
-# ===== Darwin Pool =====
-
-class StrategyPool:
-    def __init__(self):
-        self.strategies = [
-            Strategy("alpha"),
-            Strategy("beta"),
-            Strategy("gamma"),
-        ]
-
-    def evolve(self):
-        self.strategies.sort(key=lambda s: s.score, reverse=True)
-
-        best = self.strategies[0]
-        worst = self.strategies[-1]
-
-        logging.info(f"BEST: {best.name} ({best.score:.2f})")
-        logging.info(f"KILL: {worst.name} ({worst.score:.2f})")
-
-        # Kill & mutate
-        self.strategies.pop()
-        self.strategies.append(
-            Strategy(name=f"{best.name}_mutated")
-        )
-
-
-# ===== Worker Loop =====
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+)
 
 def main():
-    pool = StrategyPool()
-    logging.info("🧬 ClawBot Darwin Worker started")
+    logging.info("🧬 ClawBot Worker booted successfully")
+    logging.info(f"Python version: {sys.version}")
+
+    score = 0.0
+    cycle = 0
 
     while True:
-        for s in pool.strategies:
-            s.run()
+        cycle += 1
+        delta = random.uniform(-1, 2)
+        score += delta
 
-        pool.evolve()
+        logging.info(
+            f"Heartbeat #{cycle} | score={score:.2f} | delta={delta:.2f}"
+        )
 
-        logging.info("Worker heartbeat: alive")
-        time.sleep(30)  # Render friendly
-
+        # Render-friendly sleep
+        time.sleep(30)
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        logging.exception("❌ Worker crashed")
+        raise
