@@ -1,14 +1,3 @@
 fastapi
 uvicorn
-pydantic
 python-dotenv
-
-# === Core computation ===
-numpy
-
-# === Strategy simulation & scoring ===
-pandas
-
-# === Optional but recommended (logging / stability) ===
-requests
-
