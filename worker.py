@@ -1,15 +1,7 @@
 import time
-import sys
-import traceback
 
-print("ClawBot worker booting...")
+print("=== CLAWBOT WORKER BOOT ===")
 
-try:
-    while True:
-        print("Worker alive - heartbeat")
-        time.sleep(30)
-
-except Exception as e:
-    print("WORKER CRASHED")
-    traceback.print_exc()
-    sys.exit(1)
+while True:
+    print("Worker heartbeat - still alive")
+    time.sleep(30)
