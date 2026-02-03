@@ -3,13 +3,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import random
 import uuid
-
+import copy
 
 # ==================================================
 # APP
 # ==================================================
 
-app = FastAPI(title="ClawBot Darwinism Core")
+app = FastAPI(title="ClawBot Multi-World Darwinism")
 
 app.add_middleware(
     CORSMiddleware,
@@ -19,97 +19,74 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ==================================================
+# UTIL
+# ==================================================
+
+def uid():
+    return str(uuid.uuid4())[:8]
 
 # ==================================================
-# GLOBAL JUDGMENT MEMORY
-# ==================================================
-
-JUDGMENT_STATE = {
-    "global_risk": "MEDIUM",
-    "worldview": "defensive",
-    "stance": "NEUTRAL",
-    "confidence": 0.3,
-    "inertia": 1.2,
-    "generation": 1,
-    "history": []
-}
-
-
-# ==================================================
-# DARWIN COUNCIL
+# AGENT
 # ==================================================
 
 def new_agent(name: str) -> Dict:
     return {
-        "id": str(uuid.uuid4())[:8],
+        "id": uid(),
         "name": name,
         "hp": 100,
-        "fitness": 1.0,
+        "fitness": round(random.uniform(0.8, 1.2), 2),
         "alive": True
     }
 
-
-COUNCIL: List[Dict] = [
-    new_agent("HAWK"),
-    new_agent("DOVE"),
-    new_agent("CHAOS"),
-    new_agent("HISTORIAN"),
-    new_agent("SURVIVOR")
-]
-
-
-# ==================================================
-# AGENT BEHAVIOR
-# ==================================================
-
-def agent_vote(agent: Dict, market: Dict) -> str | None:
+def agent_vote(agent: Dict, market: Dict):
     if not agent["alive"]:
         return None
 
-    name = agent["name"]
-
-    if name == "HAWK" and market["risk_level"] == "high":
+    if agent["name"].startswith("HAWK") and market["risk_level"] == "high":
         return "RISK_UP"
 
-    if name == "DOVE" and market["trend"] == "down":
+    if agent["name"].startswith("DOVE") and market["trend"] == "down":
         return "STABLE"
 
-    if name == "CHAOS" and market["volatility"] == "extreme":
+    if agent["name"].startswith("CHAOS") and market["volatility"] == "extreme":
         return "CHAOS"
 
-    if name == "HISTORIAN" and market["risk_level"] == "high":
+    if agent["name"].startswith("HIST") and market["risk_level"] == "high":
         return "CRISIS_PATTERN"
 
-    if name == "SURVIVOR" and market["liquidity"] == "tight":
+    if agent["name"].startswith("SURV") and market["liquidity"] == "tight":
         return "DEFENSIVE"
 
     return None
 
+# ==================================================
+# WORLD
+# ==================================================
 
-def council_deliberate(market: Dict) -> Dict:
-    votes = []
-    contributors = []
-
-    for agent in COUNCIL:
-        vote = agent_vote(agent, market)
-        if vote:
-            weighted = agent["fitness"]
-            votes.append((vote, weighted))
-            contributors.append(agent)
-
+def new_world() -> Dict:
     return {
-        "votes": votes,
-        "contributors": contributors
+        "id": uid(),
+        "stability": 1.0,
+        "generation": 1,
+        "council": [
+            new_agent("HAWK"),
+            new_agent("DOVE"),
+            new_agent("CHAOS"),
+            new_agent("HIST"),
+            new_agent("SURV")
+        ],
+        "history": []
     }
 
+WORLDS: List[Dict] = [new_world() for _ in range(3)]
 
 # ==================================================
-# FEEDBACK & FITNESS
+# MARKET EVAL
 # ==================================================
 
-def evaluate_market(market: Dict) -> Dict:
+def evaluate_market(market: Dict):
     score = 0.0
-
     if market["risk_level"] == "high":
         score -= 0.3
     if market["trend"] == "down":
@@ -118,17 +95,17 @@ def evaluate_market(market: Dict) -> Dict:
         score -= 0.2
     if market["liquidity"] == "tight":
         score -= 0.2
+    return round(score, 2)
 
-    return {
-        "score": round(score, 2),
-        "severity": abs(score)
-    }
+# ==================================================
+# DARWINISM
+# ==================================================
 
+def apply_agent_darwin(world: Dict, severity: float):
+    for agent in world["council"]:
+        if not agent["alive"]:
+            continue
 
-def apply_darwinism(result: Dict, contributors: List[Dict]):
-    severity = result["severity"]
-
-    for agent in contributors:
         if severity > 0.6:
             agent["hp"] -= int(severity * 40)
             agent["fitness"] *= 0.9
@@ -138,56 +115,47 @@ def apply_darwinism(result: Dict, contributors: List[Dict]):
         if agent["hp"] <= 0:
             agent["alive"] = False
 
+def rebirth_agents(world: Dict):
+    for agent in world["council"]:
+        if not agent["alive"]:
+            agent.update(new_agent(agent["name"] + "_v2"))
 
-def rebirth():
-    global COUNCIL
-
-    dead = [a for a in COUNCIL if not a["alive"]]
-    for agent in dead:
-        COUNCIL.remove(agent)
-        mutant = new_agent(agent["name"] + "_v2")
-        mutant["fitness"] = round(random.uniform(0.8, 1.2), 2)
-        COUNCIL.append(mutant)
-
+def world_decay(world: Dict, severity: float):
+    world["stability"] -= severity * 0.5
+    world["generation"] += 1
 
 # ==================================================
-# JUDGMENT UPDATE
+# MULTI-WORLD EVOLUTION
 # ==================================================
 
-def update_judgment(votes: List, result: Dict):
-    global JUDGMENT_STATE
+def evolve_worlds():
+    global WORLDS
 
-    if result["severity"] > 0.7:
-        JUDGMENT_STATE["global_risk"] = "HIGH"
-        JUDGMENT_STATE["stance"] = "DEFENSIVE"
-        JUDGMENT_STATE["worldview"] = "fragile"
+    # kill unstable worlds
+    WORLDS = [w for w in WORLDS if w["stability"] > 0]
 
-    JUDGMENT_STATE["confidence"] = min(
-        1.0,
-        JUDGMENT_STATE["confidence"] + (0.1 if result["severity"] < 0.6 else -0.1)
-    )
+    # rank
+    WORLDS.sort(key=lambda w: w["stability"], reverse=True)
 
-    JUDGMENT_STATE["generation"] += 1
-
+    # clone best world if count < 3
+    while len(WORLDS) < 3:
+        parent = copy.deepcopy(WORLDS[0])
+        parent["id"] = uid()
+        parent["stability"] *= random.uniform(0.9, 1.1)
+        parent["generation"] += 1
+        WORLDS.append(parent)
 
 # ==================================================
 # API
 # ==================================================
 
 @app.get("/")
-def health():
-    return {"status": "ClawBot Darwinism Alive"}
+def root():
+    return {"status": "Multi-World Darwinism Online"}
 
-
-@app.get("/council")
-def council_state():
-    return COUNCIL
-
-
-@app.get("/world")
-def world():
-    return JUDGMENT_STATE
-
+@app.get("/worlds")
+def list_worlds():
+    return WORLDS
 
 @app.post("/simulate/market")
 def simulate_market(
@@ -203,24 +171,35 @@ def simulate_market(
         "liquidity": liquidity
     }
 
-    council_result = council_deliberate(market)
-    evaluation = evaluate_market(market)
+    for world in WORLDS:
+        votes = []
+        for agent in world["council"]:
+            vote = agent_vote(agent, market)
+            if vote:
+                votes.append(vote)
 
-    apply_darwinism(evaluation, council_result["contributors"])
-    rebirth()
-    update_judgment(council_result["votes"], evaluation)
+        score = evaluate_market(market)
+        severity = abs(score)
 
-    JUDGMENT_STATE["history"].append({
-        "market": market,
-        "evaluation": evaluation,
-        "votes": council_result["votes"]
-    })
+        apply_agent_darwin(world, severity)
+        rebirth_agents(world)
+        world_decay(world, severity)
+
+        world["history"].append({
+            "market": market,
+            "votes": votes,
+            "score": score
+        })
+
+    evolve_worlds()
 
     return {
         "status": "SIMULATION_COMPLETE",
         "market": market,
-        "evaluation": evaluation,
-        "council_votes": council_result["votes"],
-        "council_state": COUNCIL,
-        "judgment": JUDGMENT_STATE
+        "world_rank": sorted(
+            [{"id": w["id"], "stability": round(w["stability"], 3)} for w in WORLDS],
+            key=lambda x: x["stability"],
+            reverse=True
+        ),
+        "worlds": WORLDS
     }
