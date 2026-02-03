@@ -7,6 +7,7 @@ import time
 from typing import Optional
 
 from fastapi import FastAPI, Request, HTTPException
+from fastapi.middleware.cors import CORSMiddleware  # ✅ เพิ่ม
 
 from agents.finance_agents import run_finance_swarm
 from memory.judgment_state import get_judgment, overwrite_judgment
@@ -20,6 +21,16 @@ from market.feedback_loop import run_market_feedback_loop
 # =========================
 
 app = FastAPI()
+
+# ✅ CORS ต้องอยู่ตรงนี้ (ก่อน include_router)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(world_router)
 
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "")
@@ -97,7 +108,6 @@ async def line_webhook(request: Request):
     if not LINE_CHANNEL_SECRET:
         raise HTTPException(status_code=500, detail="LINE_CHANNEL_SECRET not set")
 
-    # verify signature
     hash_value = hmac.new(
         LINE_CHANNEL_SECRET.encode("utf-8"),
         body,
@@ -125,9 +135,6 @@ async def line_webhook(request: Request):
 
         mode = detect_mode(user_text)
 
-        # =========================
-        # CALL AI (SAFE)
-        # =========================
         try:
             if mode in ["crypto", "commodity", "watchlist"]:
                 ai_text = run_finance_swarm(user_text)
@@ -141,18 +148,12 @@ async def line_webhook(request: Request):
             ai_text = "ระบบกำลังประมวลผลหนัก ลองถามใหม่อีกครั้ง"
             ai_raw = None
 
-        # =========================
-        # EVOLUTION (FAIL-SAFE)
-        # =========================
         try:
             if isinstance(ai_raw, dict):
                 evolve_from_council(ai_raw)
         except Exception as e:
             print("EVOLVE ERROR:", e)
 
-        # =========================
-        # REPLY LINE
-        # =========================
         try:
             reply_line(reply_token, ai_text)
         except Exception as e:
