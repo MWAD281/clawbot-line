@@ -3,11 +3,10 @@ import hmac
 import hashlib
 import base64
 import requests
-import time
-from typing import Optional
+from typing import Optional, Dict, List
 
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.middleware.cors import CORSMiddleware  # ✅ เพิ่ม
+from fastapi.middleware.cors import CORSMiddleware
 
 from agents.finance_agents import run_finance_swarm
 from memory.judgment_state import get_judgment, overwrite_judgment
@@ -22,7 +21,6 @@ from market.feedback_loop import run_market_feedback_loop
 
 app = FastAPI()
 
-# ✅ CORS ต้องอยู่ตรงนี้ (ก่อน include_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -33,12 +31,64 @@ app.add_middleware(
 
 app.include_router(world_router)
 
+
+# =========================
+# ENV
+# =========================
+
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "")
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply"
 OPENAI_URL = "https://api.openai.com/v1/responses"
+
+
+# =========================
+# COUNCIL
+# =========================
+
+def council_vote(market_state: Dict) -> Dict:
+    votes = []
+
+    # Hawk – ระวังความเสี่ยง
+    if market_state["risk_level"] == "high":
+        votes.append("RISK_UP")
+
+    # Dove – มองผ่อนคลาย
+    if market_state["trend"] == "down" and market_state["liquidity"] != "tight":
+        votes.append("STABLE")
+
+    # Chaos – tail risk
+    if market_state["volatility"] == "extreme":
+        votes.append("CHAOS")
+
+    # Historian – เทียบอดีต
+    if market_state["trend"] == "down" and market_state["risk_level"] == "high":
+        votes.append("CRISIS_PATTERN")
+
+    # Survivor – โหมดเอาตัวรอด
+    if market_state["liquidity"] == "tight":
+        votes.append("DEFENSIVE")
+
+    return {
+        "votes": votes,
+        "count": len(votes)
+    }
+
+
+def apply_council_to_judgment(judgment: Dict, council: Dict) -> Dict:
+    new_judgment = judgment.copy()
+
+    if "CHAOS" in council["votes"]:
+        new_judgment["worldview"] = "fragile"
+        new_judgment["confidence"] = min(1.0, judgment.get("confidence", 0.2) + 0.2)
+
+    if council["count"] >= 3:
+        new_judgment["stance"] = "DEFENSIVE"
+        new_judgment["global_risk"] = "HIGH"
+
+    return new_judgment
 
 
 # =========================
@@ -73,27 +123,22 @@ def build_system_prompt(mode: str) -> str:
         return (
             "คุณคือ ClawBot นักวิเคราะห์ macro เชิงระบบ "
             "วิเคราะห์ Macro → Risk → Transmission → Asset Impact → What to Watch "
-            "ไม่ปลอบใจ ไม่ให้คำแนะนำซื้อขายตรง "
-            "ตอนท้ายต้องมีหัวข้อ 'Judgment:' และฟันธง"
+            "ตอนท้ายต้องมีหัวข้อ Judgment:"
         )
 
     if mode == "investor":
         return (
             "คุณคือ ClawBot มุมมองนักลงทุนเชิงระบบ "
-            "โฟกัส Macro → Risk → Asset Impact → Positioning "
-            "ไม่ให้คำแนะนำซื้อขายตรง"
+            "โฟกัส Macro → Risk → Asset Impact"
         )
 
     if mode == "ultra_short":
-        return (
-            "ตอบ 1 ประโยคเท่านั้น "
-            "ต้องมี judgment ชัด ไม่กลาง ๆ"
-        )
+        return "ตอบ 1 ประโยค judgment ชัดเจน"
 
     if mode == "watchlist":
-        return "สรุป bullet สั้น ๆ 2–3 ประเด็นที่ควรจับตา"
+        return "สรุป bullet สั้น ๆ 2–3 ประเด็น"
 
-    return "ตอบสั้น กระชับ คม โฟกัส macro risk"
+    return "ตอบสั้น กระชับ โฟกัส macro risk"
 
 
 # =========================
@@ -103,133 +148,36 @@ def build_system_prompt(mode: str) -> str:
 @app.post("/line/webhook")
 async def line_webhook(request: Request):
     body = await request.body()
-    x_line_signature = request.headers.get("X-Line-Signature", "")
-
-    if not LINE_CHANNEL_SECRET:
-        raise HTTPException(status_code=500, detail="LINE_CHANNEL_SECRET not set")
+    signature = request.headers.get("X-Line-Signature", "")
 
     hash_value = hmac.new(
-        LINE_CHANNEL_SECRET.encode("utf-8"),
+        LINE_CHANNEL_SECRET.encode(),
         body,
         hashlib.sha256
     ).digest()
-    signature = base64.b64encode(hash_value).decode()
 
-    if not hmac.compare_digest(signature, x_line_signature):
+    if base64.b64encode(hash_value).decode() != signature:
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-    try:
-        data = await request.json()
-    except Exception:
-        return {"ok": False, "error": "Invalid JSON"}
+    data = await request.json()
 
     for event in data.get("events", []):
         if event.get("type") != "message":
             continue
 
-        reply_token = event.get("replyToken")
-        user_text = event.get("message", {}).get("text", "").strip()
-
-        if not reply_token or not user_text:
-            continue
+        reply_token = event["replyToken"]
+        user_text = event["message"]["text"]
 
         mode = detect_mode(user_text)
+        ai_text = run_finance_swarm(user_text)
 
-        try:
-            if mode in ["crypto", "commodity", "watchlist"]:
-                ai_text = run_finance_swarm(user_text)
-                ai_raw = None
-            else:
-                result = call_openai(user_text, mode)
-                ai_text = result["text"]
-                ai_raw = result["raw"]
-        except Exception as e:
-            print("AI ERROR:", e)
-            ai_text = "ระบบกำลังประมวลผลหนัก ลองถามใหม่อีกครั้ง"
-            ai_raw = None
-
-        try:
-            if isinstance(ai_raw, dict):
-                evolve_from_council(ai_raw)
-        except Exception as e:
-            print("EVOLVE ERROR:", e)
-
-        try:
-            reply_line(reply_token, ai_text)
-        except Exception as e:
-            print("LINE ERROR:", e)
+        reply_line(reply_token, ai_text)
 
     return {"ok": True}
 
 
 # =========================
-# OPENAI
-# =========================
-
-def call_openai(user_text: str, mode: str) -> dict:
-    if not OPENAI_API_KEY:
-        raise RuntimeError("OPENAI_API_KEY not set")
-
-    headers = {
-        "Authorization": f"Bearer {OPENAI_API_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    judgment = get_judgment()
-    system_prompt = build_system_prompt(mode)
-
-    system_prompt += (
-        "\n\n[GLOBAL JUDGMENT STATE]\n"
-        f"Global Risk: {judgment.get('global_risk')}\n"
-        f"Worldview: {judgment.get('worldview')}\n"
-        f"Stance: {judgment.get('stance')}\n"
-    )
-
-    payload = {
-        "model": "gpt-4.1-mini",
-        "input": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_text}
-        ]
-    }
-
-    r = requests.post(
-        OPENAI_URL,
-        headers=headers,
-        json=payload,
-        timeout=20
-    )
-    r.raise_for_status()
-
-    data = r.json()
-    return {
-        "text": data["output"][0]["content"][0]["text"],
-        "raw": data
-    }
-
-
-# =========================
-# LINE REPLY
-# =========================
-
-def reply_line(reply_token: str, text: str):
-    headers = {
-        "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}",
-        "Content-Type": "application/json"
-    }
-
-    payload = {
-        "replyToken": reply_token,
-        "messages": [
-            {"type": "text", "text": text}
-        ]
-    }
-
-    requests.post(LINE_REPLY_URL, headers=headers, json=payload, timeout=10)
-
-
-# =========================
-# MARKET SIMULATION API
+# MARKET SIMULATION
 # =========================
 
 @app.post("/simulate/market")
@@ -246,37 +194,50 @@ def simulate_market(
         "liquidity": liquidity
     }
 
-    print("SIMULATE MARKET:", market_state)
+    council = council_vote(market_state)
 
     result = run_market_feedback_loop(market_state)
+
+    current_judgment = get_judgment()
+    updated_judgment = apply_council_to_judgment(current_judgment, council)
+
+    overwrite_judgment(updated_judgment)
 
     return {
         "status": "SIMULATION_COMPLETE",
         "market_state": market_state,
-        "result": result
+        "council": council,
+        "result": result,
+        "judgment": updated_judgment
     }
 
 
 # =========================
-# HEALTH / WORLD
+# HEALTH
 # =========================
 
 @app.get("/")
-def health_check():
+def health():
     return {"status": "ClawBot alive"}
 
 @app.get("/world")
-def world_state():
+def world():
     return get_judgment()
 
-@app.post("/world/fear")
-def inject_prebirth_fear():
-    fear_state = {
-        "global_risk": "LATENT_SYSTEMIC_RISK",
-        "worldview": "FRAGILE_COMPLEX_SYSTEM",
-        "stance": "CAUTIOUS",
-        "inertia": 2.5
+
+# =========================
+# LINE REPLY
+# =========================
+
+def reply_line(reply_token: str, text: str):
+    headers = {
+        "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}",
+        "Content-Type": "application/json"
     }
 
-    overwrite_judgment(fear_state)
-    return {"status": "FEAR IMPRINTED", "state": fear_state}
+    payload = {
+        "replyToken": reply_token,
+        "messages": [{"type": "text", "text": text}]
+    }
+
+    requests.post(LINE_REPLY_URL, headers=headers, json=payload, timeout=10)
