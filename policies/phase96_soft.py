@@ -1,12 +1,10 @@
-from clawbot.policies.base import Policy
 from clawbot.core.decision import Decision
 
-class Phase96SoftPolicy(Policy):
 
-    def decide(self, world_state: dict) -> Decision:
+class Phase96SoftPolicy:
+    def decide(self, world):
         return Decision(
-            action="NO_OP",
-            confidence=0.01,
-            reason="Phase96 SOFT_RUN observation only",
-            meta={"world": world_state}
+            action="DELEGATE_LEGACY",
+            confidence=0.99,
+            reason="phase96_soft_wrap"
         )
