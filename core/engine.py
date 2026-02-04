@@ -1,33 +1,35 @@
-from clawbot.infra.logger import get_logger
-from clawbot.infra.clock import Clock
-from clawbot.core.world import World
+import time
 from clawbot.core.safety import Safety
-from clawbot.evaluation.judge import judge
+
 
 class Engine:
-    def __init__(self, policy, interval_sec: int = 60):
+    def __init__(self, policy, adapter, clock=time):
         self.policy = policy
-        self.clock = Clock()
-        self.world = World()
-        self.interval = interval_sec
-        self.logger = get_logger("PHASE96")
+        self.adapter = adapter
+        self.clock = clock
+        self.cycle = 0
 
-    def run_once(self, cycle: int):
-        world_state = self.world.snapshot()
-        decision = self.policy.decide(world_state)
+    def run_once(self):
+        self.cycle += 1
 
-        if Safety.allow(decision):
-            scores = judge(decision)
-            self.logger.info(
-                f"| cycle={cycle} | decision={decision.action} "
-                f"| confidence={decision.confidence} "
-                f"| scores={scores}"
-            )
+        world = {
+            "timestamp": self.clock.time(),
+            "cycle": self.cycle,
+        }
 
-    def run_forever(self):
-        cycle = 1
-        self.logger.info("PHASE96 | STARTED | mode=SOFT_RUN_SAFE")
+        decision = self.policy.decide(world)
+
+        # ครอบความปลอดภัย
+        decision = Safety.enforce(decision)
+
+        # Phase B = delegate ทุกอย่าง
+        if decision.action == "DELEGATE_LEGACY":
+            return self.adapter.execute(world)
+
+        return decision
+
+    def run_forever(self, interval_sec=60):
         while True:
-            self.run_once(cycle)
-            cycle += 1
-            self.clock.sleep(self.interval)
+            result = self.run_once()
+            print(f"[ENGINE] cycle={self.cycle} result={result}")
+            time.sleep(interval_sec)
