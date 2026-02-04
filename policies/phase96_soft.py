@@ -1,6 +1,7 @@
 from clawbot.decision import Decision
 from clawbot.sizing.position import PositionSizer
 from clawbot.analysis.regime import RegimeClassifier
+from clawbot.analysis.regime_memory import RegimeMemory
 from clawbot.evaluation.metrics import Metrics
 
 
@@ -8,24 +9,20 @@ class Phase96SoftPolicy:
     def __init__(self):
         self.name = "phase96_soft"
 
-        # === REGIME GENOMES ===
         self.genome = {
             "trending": {
                 "confidence_threshold": 0.6,
                 "risk_level": 0.7,
-                "timing_bias": 1,
                 "sizing_strategy": "kelly",
             },
             "range": {
                 "confidence_threshold": 0.75,
                 "risk_level": 0.4,
-                "timing_bias": 0,
                 "sizing_strategy": "fixed",
             },
             "volatile": {
                 "confidence_threshold": 0.85,
                 "risk_level": 0.3,
-                "timing_bias": -1,
                 "sizing_strategy": "conservative",
             },
         }
@@ -33,25 +30,21 @@ class Phase96SoftPolicy:
         self.metrics = Metrics()
         self.sizer = PositionSizer()
         self.regime_classifier = RegimeClassifier()
+        self.regime_memory = RegimeMemory()
 
     def decide(self, world):
         regime = self.regime_classifier.classify(world)
-        g = self.genome[regime.name]
+        self.regime_memory.record(regime.name)
 
-        signal = world.signal_strength()
-        confidence = abs(signal)
+        g = self.genome[regime.name]
+        confidence = abs(world.signal_strength())
 
         if confidence < g["confidence_threshold"]:
-            decision = Decision.no_trade(
-                reason="low_confidence",
-                confidence=confidence,
-            )
-            self.metrics.record(decision)
-            return decision
+            d = Decision.no_trade("low_confidence", confidence)
+            self.metrics.record(d)
+            return d
 
-        # attach traits dynamically
         self.risk_level = g["risk_level"]
-        self.timing_bias = g["timing_bias"]
         self.sizing_strategy = g["sizing_strategy"]
 
         size = self.sizer.size(
@@ -60,15 +53,15 @@ class Phase96SoftPolicy:
             confidence=confidence,
         )
 
-        decision = Decision.trade(
-            side="buy" if signal > 0 else "sell",
+        d = Decision.trade(
+            side="buy" if world.signal_strength() > 0 else "sell",
             size=size,
             confidence=confidence,
             meta={
                 "regime": regime.name,
-                "genome": g,
+                "transition_risk": self.regime_memory.transition_score(regime.name),
             },
         )
 
-        self.metrics.record(decision)
-        return decision
+        self.metrics.record(d)
+        return d
