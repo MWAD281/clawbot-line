@@ -1,24 +1,18 @@
-from clawbot.execution.simulator import TradeSimulator
+from .impact import estimate_impact
 
+class ImpactAwareExecutor:
+    def execute(self, decision, market):
+        impact = estimate_impact(
+            decision["size"], market["volume"]
+        )
 
-class Executor:
-    def __init__(self, mode="SOFT_RUN_SAFE"):
-        self.mode = mode
-        self.simulator = TradeSimulator()
-
-    def execute(self, decision, world):
-        if decision.action == "TRADE":
-            if self.mode == "SOFT_RUN_SAFE":
-                return self.simulator.execute(decision, world)
-
-        if decision.action == "NO_TRADE":
+        if impact > 0.02:
             return {
-                "status": "NO_TRADE",
-                "reason": decision.reason,
-                "cycle": world["cycle"]
+                "action": "SPLIT_ORDER",
+                "chunks": int(impact / 0.01) + 1
             }
 
-        return {
-            "status": "IGNORED",
-            "action": decision.action
-        }
+        if impact > 0.05:
+            return {"action": "SKIP_TRADE"}
+
+        return {"action": "EXECUTE"}
