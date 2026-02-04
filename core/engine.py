@@ -44,23 +44,19 @@ class Engine:
             score, reason = self.judge.evaluate(decision, execution)
             policy.metrics.record(score)
 
+        # === Phase F+ Darwinism ===
         if self.cycle % self.darwin_cycle == 0:
-            print("🧬 Darwin cycle triggered")
-            self.population.kill_losers()
+            print(f"\n🧬 DARWIN EVOLUTION @ cycle {self.cycle}")
+            self.population.evolve()
 
         return {
             "cycle": self.cycle,
-            "population": [
-                {
-                    "policy": p.name,
-                    "metrics": p.metrics.snapshot(),
-                }
-                for p in self.population.policies
-            ],
+            "population": self.population.snapshot(),
         }
 
     def run_forever(self, interval_sec=60):
+        print("🚀 Engine started | Darwinism ACTIVE")
         while True:
             result = self.run_once()
-            print(f"[ENGINE] {result}")
+            print(result)
             time.sleep(interval_sec)
