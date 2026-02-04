@@ -1,5 +1,5 @@
-class Safety:
-    @staticmethod
-    def enforce(decision):
-        # Phase B: ยังไม่ block อะไร
-        return decision
+def soft_guard(decision):
+    if decision.confidence < 0.2:
+        decision.action = "hold"
+        decision.reason += " | soft_guard_triggered"
+    return decision
