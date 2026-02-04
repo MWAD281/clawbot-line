@@ -1,22 +1,20 @@
 from clawbot.core.engine import Engine
+from clawbot.evolution.population import Population
+from clawbot.evolution.mutation import mutate_policy
 from clawbot.policies.phase96_soft import Phase96SoftPolicy
 from clawbot.adapters.legacy_phase96 import LegacyPhase96Adapter
 from clawbot.execution.executor import Executor
 from clawbot.evaluation.judge import Judge
-from clawbot.evaluation.metrics import Metrics
 
-policy = Phase96SoftPolicy()
-adapter = LegacyPhase96Adapter()
-executor = Executor(mode="SOFT_RUN_SAFE")
-judge = Judge()
-metrics = Metrics()
+policies = [Phase96SoftPolicy() for _ in range(5)]
+
+population = Population(policies)
 
 engine = Engine(
-    policy=policy,
-    adapter=adapter,
-    executor=executor,
-    judge=judge,
-    metrics=metrics
+    population=population,
+    adapter=LegacyPhase96Adapter(),
+    executor=Executor(mode="SOFT_RUN_SAFE"),
+    judge=Judge(),
 )
 
 engine.run_forever()
