@@ -1,20 +1,21 @@
+import random
 from clawbot.core.decision import Decision
+from clawbot.evaluation.metrics import Metrics
 
 
 class Phase96SoftPolicy:
-    def decide(self, world):
-        cycle = world["cycle"]
+    def __init__(self):
+        self.name = "phase96_soft"
+        self.confidence_bias = 0.5
+        self.metrics = Metrics()
 
-        # ทุก 10 cycle → ลอง trade
-        if cycle % 10 == 0:
-            return Decision(
-                action="TRADE",
-                confidence=0.85,
-                reason="phase96_engine_trade_test"
-            )
+    def decide(self, world):
+        confidence = min(0.95, max(0.05, random.random() + self.confidence_bias - 0.5))
+
+        action = "TRADE" if confidence > 0.6 else "NO_TRADE"
 
         return Decision(
-            action="NO_TRADE",
-            confidence=0.95,
-            reason="wait_and_observe"
+            action=action,
+            confidence=confidence,
+            reason="phase96_soft_policy",
         )
