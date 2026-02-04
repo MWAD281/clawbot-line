@@ -1,5 +1,5 @@
 class Safety:
     @staticmethod
-    def allow(decision) -> bool:
-        # Phase A: soft-run = allow everything but do nothing
-        return True
+    def enforce(decision):
+        # Phase B: ยังไม่ block อะไร
+        return decision
