@@ -1,5 +1,8 @@
-from datetime import datetime, timezone
+import time
 
+class Clock:
+    def now(self) -> float:
+        return time.time()
 
-def utcnow():
-    return datetime.now(timezone.utc)
+    def sleep(self, seconds: float):
+        time.sleep(seconds)
