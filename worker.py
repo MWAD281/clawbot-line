@@ -1,19 +1,13 @@
-import time
-
 from clawbot.core.engine import Engine
 from clawbot.policies.phase96_soft import Phase96SoftPolicy
-from clawbot.infra.logger import log
+from clawbot.infra.config import PHASE96_INTERVAL_SEC
 
-
-def main():
-    log("PHASE96", status="STARTED", mode="SOFT_RUN_SAFE")
-
-    engine = Engine(policy=Phase96SoftPolicy())
-
-    while True:
-        engine.run_once()
-        time.sleep(60)
-
+def start_phase96_soft():
+    engine = Engine(
+        policy=Phase96SoftPolicy(),
+        interval_sec=PHASE96_INTERVAL_SEC
+    )
+    engine.run_forever()
 
 if __name__ == "__main__":
-    main()
+    start_phase96_soft()
