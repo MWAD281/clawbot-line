@@ -6,15 +6,22 @@ from clawbot.adapters.legacy_phase96 import LegacyPhase96Adapter
 from clawbot.execution.executor import Executor
 from clawbot.evaluation.judge import Judge
 
+# initial population
 policies = [Phase96SoftPolicy() for _ in range(5)]
 
-population = Population(policies)
+population = Population(
+    policies=policies,
+    min_size=3,
+    max_size=6,
+    mutator=mutate_policy,
+)
 
 engine = Engine(
     population=population,
     adapter=LegacyPhase96Adapter(),
     executor=Executor(mode="SOFT_RUN_SAFE"),
     judge=Judge(),
+    darwin_cycle=10,
 )
 
 engine.run_forever()
