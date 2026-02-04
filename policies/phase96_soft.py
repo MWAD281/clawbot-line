@@ -1,14 +1,12 @@
-from clawbot.core.decision import Decision
-import random
+# clawbot/policies/phase96_soft.py
 
-def decide(market_snapshot: dict) -> Decision:
-    confidence = random.uniform(0.1, 0.9)
+from legacy.phase96_adapter import LegacyPhase96Adapter
 
-    action = "trade" if confidence > 0.6 else "hold"
-    reason = "phase96_soft_policy"
+class Phase96SoftPolicy:
+    phase = "PHASE96_SOFT"
 
-    return Decision(
-        action=action,
-        confidence=confidence,
-        reason=reason
-    )
+    def __init__(self):
+        self.legacy = LegacyPhase96Adapter()
+
+    def decide(self, world=None):
+        return self.legacy.decide(world)
