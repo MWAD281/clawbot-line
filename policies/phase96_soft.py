@@ -1,21 +1,20 @@
 from clawbot.core.decision import Decision
-import random
 
 
 class Phase96SoftPolicy:
     def decide(self, world):
         cycle = world["cycle"]
 
-        # Phase C: ทดลอง override เป็นช่วง ๆ
+        # ทุก 10 cycle → ลอง trade
         if cycle % 10 == 0:
             return Decision(
-                action="OVERRIDE",
-                confidence=0.8,
-                reason="engine_override_test"
+                action="TRADE",
+                confidence=0.85,
+                reason="phase96_engine_trade_test"
             )
 
         return Decision(
-            action="DELEGATE_LEGACY",
-            confidence=0.99,
-            reason="safe_delegate"
+            action="NO_TRADE",
+            confidence=0.95,
+            reason="wait_and_observe"
         )
