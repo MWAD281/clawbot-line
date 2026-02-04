@@ -1,27 +1,14 @@
+import time
 from clawbot.core.engine import Engine
-from clawbot.evolution.population import Population
-from clawbot.evolution.mutation import mutate_policy
-from clawbot.policies.phase96_soft import Phase96SoftPolicy
-from clawbot.adapters.legacy_phase96 import LegacyPhase96Adapter
-from clawbot.execution.executor import Executor
-from clawbot.evaluation.judge import Judge
 
-# initial population
-policies = [Phase96SoftPolicy() for _ in range(5)]
+# ใช้ market เดิมของคุณ
+from world.market_probe import get_market_snapshot
 
-population = Population(
-    policies=policies,
-    min_size=3,
-    max_size=6,
-    mutator=mutate_policy,
-)
+engine = Engine(mode="SOFT_RUN_SAFE")
 
-engine = Engine(
-    population=population,
-    adapter=LegacyPhase96Adapter(),
-    executor=Executor(mode="SOFT_RUN_SAFE"),
-    judge=Judge(),
-    darwin_cycle=10,
-)
+print("PHASE96 | clawbot-phase-96-worker STARTED | mode=SOFT_RUN_SAFE")
 
-engine.run_forever()
+while True:
+    market = get_market_snapshot()
+    engine.step(market)
+    time.sleep(5)
