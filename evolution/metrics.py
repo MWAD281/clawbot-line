@@ -1,8 +1,28 @@
-def survival_score(decision) -> float:
-    return 1.0
+class Metrics:
+    def __init__(self):
+        self.total = 0
+        self.success = 0
+        self.fail = 0
+        self.score_sum = 0.0
 
-def regret_score(decision) -> float:
-    return 0.0
+    def record(self, score: float):
+        self.total += 1
+        self.score_sum += score
 
-def stability_score(decision) -> float:
-    return 1.0
+        if score > 0:
+            self.success += 1
+        else:
+            self.fail += 1
+
+    def snapshot(self):
+        if self.total == 0:
+            avg = 0
+        else:
+            avg = self.score_sum / self.total
+
+        return {
+            "total": self.total,
+            "success": self.success,
+            "fail": self.fail,
+            "avg_score": round(avg, 4),
+        }
