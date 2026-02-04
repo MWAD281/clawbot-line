@@ -1,14 +1,16 @@
+# worker.py
+
 import time
-from clawbot.core.engine import Engine
+from core.engine import Engine
+from policies.phase96_soft import Phase96SoftPolicy
 
-# ใช้ market เดิมของคุณ
-from world.market_probe import get_market_snapshot
+def run():
+    policy = Phase96SoftPolicy()
+    engine = Engine(policy=policy, mode="SOFT_RUN_SAFE")
 
-engine = Engine(mode="SOFT_RUN_SAFE")
+    while True:
+        engine.step(world=None)
+        time.sleep(5)
 
-print("PHASE96 | clawbot-phase-96-worker STARTED | mode=SOFT_RUN_SAFE")
-
-while True:
-    market = get_market_snapshot()
-    engine.step(market)
-    time.sleep(5)
+if __name__ == "__main__":
+    run()
