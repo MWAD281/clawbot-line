@@ -5,22 +5,22 @@ from clawbot.core.safety import Safety
 class Engine:
     def __init__(
         self,
-        policy,
+        population,
         adapter,
         executor,
         judge,
-        metrics,
         clock=time,
-        override_threshold=0.7
+        override_threshold=0.7,
+        darwin_cycle=10,
     ):
-        self.policy = policy
+        self.population = population
         self.adapter = adapter
         self.executor = executor
         self.judge = judge
-        self.metrics = metrics
         self.clock = clock
         self.override_threshold = override_threshold
         self.cycle = 0
+        self.darwin_cycle = darwin_cycle
 
     def run_once(self):
         self.cycle += 1
@@ -30,25 +30,33 @@ class Engine:
             "cycle": self.cycle,
         }
 
-        decision = self.policy.decide(world)
-        decision = Safety.enforce(decision)
+        for policy in list(self.population.policies):
+            decision = policy.decide(world)
+            decision = Safety.enforce(decision)
 
-        if decision.confidence >= self.override_threshold:
-            execution = self.executor.execute(decision, world)
-        else:
-            legacy_decision = self.adapter.execute(world)
-            execution = self.executor.execute(legacy_decision, world)
-            decision = legacy_decision
+            if decision.confidence >= self.override_threshold:
+                execution = self.executor.execute(decision, world)
+            else:
+                legacy_decision = self.adapter.execute(world)
+                execution = self.executor.execute(legacy_decision, world)
+                decision = legacy_decision
 
-        score, reason = self.judge.evaluate(decision, execution)
-        self.metrics.record(score)
+            score, reason = self.judge.evaluate(decision, execution)
+            policy.metrics.record(score)
+
+        if self.cycle % self.darwin_cycle == 0:
+            print("🧬 Darwin cycle triggered")
+            self.population.kill_losers()
 
         return {
-            "decision": repr(decision),
-            "execution": execution,
-            "score": score,
-            "judge_reason": reason,
-            "metrics": self.metrics.snapshot(),
+            "cycle": self.cycle,
+            "population": [
+                {
+                    "policy": p.name,
+                    "metrics": p.metrics.snapshot(),
+                }
+                for p in self.population.policies
+            ],
         }
 
     def run_forever(self, interval_sec=60):
