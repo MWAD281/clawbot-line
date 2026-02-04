@@ -1,25 +1,27 @@
-from clawbot.policies.phase96_soft import decide
-from clawbot.core.safety import soft_guard
-from clawbot.infra.logger import log
+# clawbot/core/engine.py
+
+from infra.logger import log
+from infra.clock import now
+from core.decision import Decision
 
 class Engine:
-    def __init__(self, mode="SOFT_RUN_SAFE"):
+    def __init__(self, policy, mode="SOFT_RUN_SAFE"):
+        self.policy = policy
         self.mode = mode
         self.cycle = 0
 
-    def step(self, market_snapshot: dict):
+    def step(self, world):
         self.cycle += 1
 
-        decision = decide(market_snapshot)
-        decision = soft_guard(decision)
+        decision = self.policy.decide(world)
 
-        log("PHASE96", {
+        log({
+            "phase": self.policy.phase,
             "cycle": self.cycle,
-            "decision": {
-                "action": decision.action,
-                "confidence": round(decision.confidence, 3),
-                "reason": decision.reason
-            }
+            "decision": decision.to_dict(),
+            "mode": self.mode,
+            "ts": now()
         })
 
+        # Phase B: ยังไม่ execute action จริง
         return decision
