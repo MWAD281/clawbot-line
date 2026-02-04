@@ -1,10 +1,12 @@
-from dataclasses import dataclass
-from typing import Any, Dict
-
-
-@dataclass
 class Decision:
-    action: str
-    confidence: float
-    reason: str
-    meta: Dict[str, Any] | None = None
+    def __init__(self, action, confidence=0.0, reason=""):
+        self.action = action
+        self.confidence = confidence
+        self.reason = reason
+
+    def __repr__(self):
+        return (
+            f"Decision(action={self.action}, "
+            f"confidence={self.confidence}, "
+            f"reason={self.reason})"
+        )
