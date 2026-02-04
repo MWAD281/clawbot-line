@@ -1,5 +1,8 @@
-import datetime
+# clawbot/infra/logger.py
 
-def log(tag: str, payload: dict):
-    ts = datetime.datetime.utcnow().isoformat()
-    print(f"{tag} | {ts} | {payload}")
+import json
+import sys
+
+def log(payload: dict):
+    sys.stdout.write(json.dumps(payload) + "\n")
+    sys.stdout.flush()
