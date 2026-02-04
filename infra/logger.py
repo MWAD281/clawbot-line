@@ -1,16 +1,5 @@
-import logging
-import sys
+import datetime
 
-def get_logger(name: str):
-    logger = logging.getLogger(name)
-    if logger.handlers:
-        return logger
-
-    logger.setLevel(logging.INFO)
-    handler = logging.StreamHandler(sys.stdout)
-    formatter = logging.Formatter(
-        "[%(asctime)s] %(levelname)s | %(name)s | %(message)s"
-    )
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    return logger
+def log(tag: str, payload: dict):
+    ts = datetime.datetime.utcnow().isoformat()
+    print(f"{tag} | {ts} | {payload}")
