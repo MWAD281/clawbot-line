@@ -1,46 +1,19 @@
-# worker.py
-# PHASE 96 - SAFE SOFT RUN (RENDER STABLE)
-# ❌ no imports from project
-# ❌ no side effects
-# ✅ infinite alive worker
-# ✅ log only
-
 import time
-import logging
-from datetime import datetime
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | PHASE96 | %(message)s",
-)
+from clawbot.core.engine import Engine
+from clawbot.policies.phase96_soft import Phase96SoftPolicy
+from clawbot.infra.logger import log
 
-SERVICE_NAME = "clawbot-phase-96-worker"
-MODE = "SOFT_RUN_SAFE"
 
-def soft_decision():
-    return {
-        "action": "HOLD",
-        "confidence": 0.42,
-        "reason": "phase96_soft_run_safe"
-    }
+def main():
+    log("PHASE96", status="STARTED", mode="SOFT_RUN_SAFE")
 
-if __name__ == "__main__":
-    logging.info(f"{SERVICE_NAME} STARTED | mode={MODE}")
-
-    cycle = 0
+    engine = Engine(policy=Phase96SoftPolicy())
 
     while True:
-        try:
-            cycle += 1
-            decision = soft_decision()
+        engine.run_once()
+        time.sleep(60)
 
-            logging.info({
-                "cycle": cycle,
-                "timestamp": datetime.utcnow().isoformat(),
-                "decision": decision
-            })
 
-            time.sleep(60)  # เบาที่สุดสำหรับ Render
-        except Exception as e:
-            logging.error(f"SAFE ERROR (ignored): {e}")
-            time.sleep(30)
+if __name__ == "__main__":
+    main()
