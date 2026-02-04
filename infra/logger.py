@@ -1,11 +1,16 @@
-import json
-from datetime import datetime
+import logging
+import sys
 
+def get_logger(name: str):
+    logger = logging.getLogger(name)
+    if logger.handlers:
+        return logger
 
-def log(tag: str, **data):
-    payload = {
-        "tag": tag,
-        "timestamp": datetime.utcnow().isoformat(),
-        **data,
-    }
-    print(json.dumps(payload))
+    logger.setLevel(logging.INFO)
+    handler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter(
+        "[%(asctime)s] %(levelname)s | %(name)s | %(message)s"
+    )
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    return logger
