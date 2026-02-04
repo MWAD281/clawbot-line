@@ -1,7 +1,16 @@
-from dataclasses import dataclass
+# clawbot/core/decision.py
 
-@dataclass
 class Decision:
-    action: str        # "trade" | "hold"
-    confidence: float  # 0.0 - 1.0
-    reason: str
+    def __init__(self, action, confidence=0.0, reason=None, meta=None):
+        self.action = action
+        self.confidence = confidence
+        self.reason = reason or ""
+        self.meta = meta or {}
+
+    def to_dict(self):
+        return {
+            "action": self.action,
+            "confidence": self.confidence,
+            "reason": self.reason,
+            "meta": self.meta,
+        }
