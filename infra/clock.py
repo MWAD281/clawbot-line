@@ -1,4 +1,6 @@
+# clawbot/infra/clock.py
+
 import time
 
 def now():
-    return time.time()
+    return int(time.time())
