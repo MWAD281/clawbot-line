@@ -2,10 +2,12 @@ from fastapi import FastAPI
 
 app = FastAPI()
 
+
 @app.get("/")
 def root():
-    return {"status": "clawbot online"}
+    return {"status": "clawbot-alive"}
+
 
 @app.get("/health")
 def health():
-    return {"ok": True}
+    return {"health": "ok"}
