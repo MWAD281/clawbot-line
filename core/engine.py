@@ -1,6 +1,5 @@
 import time
 from clawbot.core.safety import Safety
-from clawbot.core.decision import Decision
 
 
 class Engine:
@@ -8,11 +7,13 @@ class Engine:
         self,
         policy,
         adapter,
+        executor,
         clock=time,
         override_threshold=0.7
     ):
         self.policy = policy
         self.adapter = adapter
+        self.executor = executor
         self.clock = clock
         self.override_threshold = override_threshold
         self.cycle = 0
@@ -25,20 +26,16 @@ class Engine:
             "cycle": self.cycle,
         }
 
-        engine_decision = self.policy.decide(world)
-        engine_decision = Safety.enforce(engine_decision)
+        decision = self.policy.decide(world)
+        decision = Safety.enforce(decision)
 
-        # 🔁 Phase C logic
-        if engine_decision.action == "OVERRIDE":
-            if engine_decision.confidence >= self.override_threshold:
-                print("[ENGINE] OVERRIDE decision applied")
-                return engine_decision
-            else:
-                print("[ENGINE] override confidence too low → fallback legacy")
+        if decision.confidence >= self.override_threshold:
+            print("[ENGINE] executing engine decision")
+            return self.executor.execute(decision, world)
 
-        # fallback to legacy
+        print("[ENGINE] fallback to legacy")
         legacy_decision = self.adapter.execute(world)
-        return legacy_decision
+        return self.executor.execute(legacy_decision, world)
 
     def run_forever(self, interval_sec=60):
         while True:
