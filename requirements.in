@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+python-dotenv
+line-bot-sdk>=3.0
+openai>=1.0
+pydantic-settings
+httpx
+slowapi
+redis>=4.0
