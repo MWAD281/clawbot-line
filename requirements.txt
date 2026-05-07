@@ -96,6 +96,8 @@ python-dotenv==1.2.1
     # via
     #   -r requirements.in
     #   pydantic-settings
+python-json-logger==4.0.0
+    # via -r requirements.in
 redis==7.0.1
     # via -r requirements.in
 requests==2.32.5
@@ -121,6 +123,7 @@ typing-extensions==4.15.0
     #   openai
     #   pydantic
     #   pydantic-core
+    #   python-json-logger
     #   starlette
     #   typing-inspection
     #   uvicorn

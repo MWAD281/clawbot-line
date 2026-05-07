@@ -7,3 +7,4 @@ pydantic-settings
 httpx
 slowapi
 redis>=4.0
+python-json-logger

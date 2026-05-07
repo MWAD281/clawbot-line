@@ -1,7 +1,9 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from pythonjsonlogger.json import JsonFormatter
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -9,10 +11,26 @@ from app.api.health import router as health_router
 from app.api.webhook import router as webhook_router
 from app.limiter import limiter
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s %(message)s",
-)
+
+def _configure_logging() -> None:
+    # In test environments keep plain text so pytest output is readable
+    if os.getenv("APP_ENV", "production") == "test":
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s %(levelname)s %(name)s %(message)s",
+        )
+        return
+
+    handler = logging.StreamHandler()
+    handler.setFormatter(
+        JsonFormatter("%(asctime)s %(levelname)s %(name)s %(message)s")
+    )
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    root.handlers = [handler]
+
+
+_configure_logging()
 logger = logging.getLogger(__name__)
 
 
