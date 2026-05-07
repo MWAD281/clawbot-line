@@ -21,7 +21,7 @@ async-timeout==5.0.1
     #   redis
 attrs==26.1.0
     # via aiohttp
-backports-asyncio-runner==1.2.0
+backports-asyncio-runner==1.2.0 ; python_version < "3.11"
     # via pytest-asyncio
 certifi==2026.4.22
     # via
