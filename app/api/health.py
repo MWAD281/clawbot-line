@@ -2,7 +2,7 @@ import logging
 
 from fastapi import APIRouter
 
-from app.config import settings
+from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -27,4 +27,4 @@ async def health_check():
         checks["line"] = f"error: {e}"
 
     status = "ok" if all("error" not in str(v) for v in checks.values()) else "degraded"
-    return {"status": status, "checks": checks, "env": settings.app_env}
+    return {"status": status, "checks": checks, "env": get_settings().app_env}

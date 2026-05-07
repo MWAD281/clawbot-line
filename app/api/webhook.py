@@ -1,18 +1,22 @@
 import logging
+from functools import lru_cache
 
 from fastapi import APIRouter, Header, HTTPException, Request
 from linebot.v3 import WebhookParser
 from linebot.v3.exceptions import InvalidSignatureError
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
 
-from app.config import settings
+from app.config import get_settings
 from app.core.ai_engine import get_ai_reply
 from app.services.line_service import reply_text
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-parser = WebhookParser(settings.line_channel_secret)
+
+@lru_cache
+def _get_parser() -> WebhookParser:
+    return WebhookParser(get_settings().line_channel_secret)
 
 
 @router.post("/callback")
@@ -21,18 +25,21 @@ async def callback(
     x_line_signature: str = Header(None, alias="X-Line-Signature"),
 ):
     body = await request.body()
-    body_text = body.decode("utf-8")
+
+    if len(body) > 1_000_000:
+        raise HTTPException(status_code=413, detail="Payload too large")
 
     if not x_line_signature:
         raise HTTPException(status_code=400, detail="Missing X-Line-Signature header")
 
+    body_text = body.decode("utf-8")
     try:
-        events = parser.parse(body_text, x_line_signature)
+        events = _get_parser().parse(body_text, x_line_signature)
     except InvalidSignatureError:
         logger.warning("Invalid LINE signature received")
         raise HTTPException(status_code=400, detail="Invalid signature")
     except Exception as e:
-        logger.error(f"Webhook parse error: {e}")
+        logger.error("Webhook parse error: %s", type(e).__name__)
         raise HTTPException(status_code=500, detail="Webhook processing error")
 
     for event in events:
@@ -45,7 +52,7 @@ async def callback(
                 reply = await get_ai_reply(user_id, user_text)
                 await reply_text(reply_token, reply)
             except Exception as e:
-                logger.error(f"Failed to handle message from {user_id}: {e}")
+                logger.error("Failed to handle message from %s...: %s", user_id[:8], type(e).__name__)
                 try:
                     await reply_text(reply_token, "Sorry, something went wrong. Please try again.")
                 except Exception:
