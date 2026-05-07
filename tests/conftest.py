@@ -1,5 +1,16 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+
+
+def _make_completion_response(content: str = "Hello from bot"):
+    """Build a minimal ChatCompletion-like mock with finish_reason='stop'."""
+    choice = MagicMock()
+    choice.finish_reason = "stop"
+    choice.message.content = content
+    choice.message.tool_calls = None
+    resp = MagicMock()
+    resp.choices = [choice]
+    return resp
 
 
 @pytest.fixture(autouse=True)
@@ -57,7 +68,7 @@ def mock_line_reply():
 
 @pytest.fixture
 def mock_openai_reply():
-    """Patch chat_completion at the ai_engine module where it was imported."""
-    with patch("app.core.ai_engine.chat_completion", new_callable=AsyncMock) as mock:
-        mock.return_value = "Hello from bot"
+    """Patch create_completion at the ai_engine module where it was imported."""
+    with patch("app.core.ai_engine.create_completion", new_callable=AsyncMock) as mock:
+        mock.return_value = _make_completion_response("Hello from bot")
         yield mock

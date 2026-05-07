@@ -1,5 +1,7 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from tests.conftest import _make_completion_response
 
 
 @pytest.mark.asyncio
@@ -19,8 +21,8 @@ async def test_reply_stored_in_history(mock_openai_reply):
 async def test_system_prompt_prepended():
     from app.core.ai_engine import get_ai_reply, SYSTEM_PROMPT
 
-    with patch("app.core.ai_engine.chat_completion", new_callable=AsyncMock) as mock_chat:
-        mock_chat.return_value = "ok"
+    with patch("app.core.ai_engine.create_completion", new_callable=AsyncMock) as mock_chat:
+        mock_chat.return_value = _make_completion_response("ok")
         await get_ai_reply("user2", "test")
 
     call_messages = mock_chat.call_args[0][0]
@@ -31,7 +33,7 @@ async def test_system_prompt_prepended():
 async def test_fallback_returned_on_exception():
     from app.core.ai_engine import get_ai_reply, FALLBACK_MESSAGE
 
-    with patch("app.core.ai_engine.chat_completion", new_callable=AsyncMock) as mock_chat:
+    with patch("app.core.ai_engine.create_completion", new_callable=AsyncMock) as mock_chat:
         mock_chat.side_effect = RuntimeError("API down")
         result = await get_ai_reply("user3", "hello")
 
@@ -43,7 +45,7 @@ async def test_history_not_stored_on_failure():
     from app.core.ai_engine import get_ai_reply
     from app.memory.store import get_store
 
-    with patch("app.core.ai_engine.chat_completion", new_callable=AsyncMock) as mock_chat:
+    with patch("app.core.ai_engine.create_completion", new_callable=AsyncMock) as mock_chat:
         mock_chat.side_effect = RuntimeError("API down")
         await get_ai_reply("user4", "hello")
 
@@ -53,12 +55,41 @@ async def test_history_not_stored_on_failure():
     assert "assistant" not in roles
 
 
+@pytest.mark.asyncio
+async def test_tool_call_executes_and_returns_reply():
+    """When the model requests a tool, the engine executes it and loops back for the final reply."""
+    from app.core.ai_engine import get_ai_reply
+
+    # First response: model wants to call get_price
+    tool_call = MagicMock()
+    tool_call.id = "call_abc"
+    tool_call.function.name = "get_price"
+    tool_call.function.arguments = '{"symbol": "BTCUSDT"}'
+
+    first_response = MagicMock()
+    first_response.choices[0].finish_reason = "tool_calls"
+    first_response.choices[0].message.content = None
+    first_response.choices[0].message.tool_calls = [tool_call]
+
+    # Second response: model gives final answer after seeing tool result
+    second_response = _make_completion_response("BTC is at $65,000")
+
+    with patch("app.core.ai_engine.create_completion", new_callable=AsyncMock) as mock_chat, \
+         patch("app.services.binance_service.get_price", new_callable=AsyncMock) as mock_price:
+        mock_chat.side_effect = [first_response, second_response]
+        mock_price.return_value = {"symbol": "BTCUSDT", "price": "65000.00"}
+
+        result = await get_ai_reply("user5", "What's the BTC price?")
+
+    assert result == "BTC is at $65,000"
+    assert mock_price.called
+    assert mock_chat.call_count == 2
+
+
 def test_trim_history_keeps_recent_messages():
     from app.core.ai_engine import _trim_history
 
-    # 10 messages, each ~40 chars → ~10 tokens each
     history = [{"role": "user", "content": "a" * 40} for _ in range(10)]
-    # max_tokens=50 → fits ~5 messages
     result = _trim_history(history, max_tokens=50)
     assert len(result) < len(history)
     assert result == history[len(history) - len(result):]
