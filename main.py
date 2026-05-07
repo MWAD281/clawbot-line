@@ -2,9 +2,12 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.api.health import router as health_router
 from app.api.webhook import router as webhook_router
+from app.limiter import limiter
 
 logging.basicConfig(
     level=logging.INFO,
@@ -21,6 +24,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Clawbot LINE Bot", lifespan=lifespan)
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.include_router(webhook_router)
 app.include_router(health_router)
