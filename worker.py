@@ -1,16 +1,22 @@
-# worker.py
+import asyncio
+import logging
 
-import time
-from core.engine import Engine
-from policies.phase96_soft import Phase96SoftPolicy
+logger = logging.getLogger(__name__)
 
-def run():
-    policy = Phase96SoftPolicy()
-    engine = Engine(policy=policy, mode="SOFT_RUN_SAFE")
 
+async def run_background_tasks() -> None:
+    logger.info("Background worker started")
     while True:
-        engine.step(world=None)
-        time.sleep(5)
+        try:
+            # Add background tasks here as needed
+            await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Worker error: {e}")
+            await asyncio.sleep(5)
+
 
 if __name__ == "__main__":
-    run()
+    logging.basicConfig(level=logging.INFO)
+    asyncio.run(run_background_tasks())
