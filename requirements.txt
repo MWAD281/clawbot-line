@@ -6,3 +6,4 @@ openai>=1.0
 pydantic-settings
 httpx
 slowapi
+redis>=4.0
