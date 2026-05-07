@@ -51,3 +51,31 @@ async def test_history_not_stored_on_failure():
     roles = [m["role"] for m in history]
     # User message is added before the AI call; no assistant reply should exist on failure
     assert "assistant" not in roles
+
+
+def test_trim_history_keeps_recent_messages():
+    from app.core.ai_engine import _trim_history
+
+    # 10 messages, each ~40 chars → ~10 tokens each
+    history = [{"role": "user", "content": "a" * 40} for _ in range(10)]
+    # max_tokens=50 → fits ~5 messages
+    result = _trim_history(history, max_tokens=50)
+    assert len(result) < len(history)
+    assert result == history[len(history) - len(result):]
+
+
+def test_trim_history_keeps_all_when_within_budget():
+    from app.core.ai_engine import _trim_history
+
+    history = [
+        {"role": "user", "content": "hi"},
+        {"role": "assistant", "content": "hello"},
+    ]
+    result = _trim_history(history, max_tokens=3500)
+    assert result == history
+
+
+def test_trim_history_empty():
+    from app.core.ai_engine import _trim_history
+
+    assert _trim_history([], max_tokens=3500) == []

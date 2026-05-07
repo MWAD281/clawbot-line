@@ -9,6 +9,7 @@ from linebot.v3.webhooks import MessageEvent, TextMessageContent
 from app.config import get_settings
 from app.core.ai_engine import get_ai_reply
 from app.limiter import limiter
+from app.memory.store import get_store
 from app.services.line_service import reply_text
 
 logger = logging.getLogger(__name__)
@@ -21,7 +22,23 @@ def _get_parser() -> WebhookParser:
 
 
 async def _handle_message(user_id: str, user_text: str, reply_token: str) -> None:
-    """Background task: call OpenAI and send LINE reply."""
+    """Background task: enforce daily limit, call OpenAI, and send LINE reply."""
+    settings = get_settings()
+    store = get_store()
+
+    usage = await store.get_daily_usage(user_id)
+    if usage >= settings.daily_message_limit:
+        try:
+            await reply_text(
+                reply_token,
+                f"You've reached your daily limit of {settings.daily_message_limit} messages. Please try again tomorrow!",
+            )
+        except Exception:
+            pass
+        return
+
+    await store.increment_daily_usage(user_id)
+
     try:
         reply = await get_ai_reply(user_id, user_text)
         await reply_text(reply_token, reply)

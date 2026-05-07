@@ -1,3 +1,4 @@
+import datetime
 import pytest
 from unittest.mock import AsyncMock, patch
 
@@ -85,3 +86,70 @@ async def test_redis_connection_failure_falls_back_to_memory():
         history = await store.get_history("u1")
 
     assert history == [{"role": "user", "content": "Hello"}]
+
+
+@pytest.mark.asyncio
+async def test_daily_usage_in_memory():
+    from app.memory.store import ConversationStore
+
+    store = ConversationStore()
+
+    assert await store.get_daily_usage("u1") == 0
+    count = await store.increment_daily_usage("u1")
+    assert count == 1
+    count = await store.increment_daily_usage("u1")
+    assert count == 2
+    assert await store.get_daily_usage("u1") == 2
+
+
+@pytest.mark.asyncio
+async def test_daily_usage_different_users_independent():
+    from app.memory.store import ConversationStore
+
+    store = ConversationStore()
+    await store.increment_daily_usage("ua")
+    await store.increment_daily_usage("ua")
+    await store.increment_daily_usage("ub")
+
+    assert await store.get_daily_usage("ua") == 2
+    assert await store.get_daily_usage("ub") == 1
+
+
+@pytest.mark.asyncio
+async def test_daily_usage_redis():
+    from app.memory.store import ConversationStore
+
+    today = datetime.date.today().isoformat()
+    stored: dict = {}
+    expiry: dict = {}
+
+    async def fake_get(key):
+        return stored.get(key)
+
+    async def fake_incr(key):
+        stored[key] = str(int(stored.get(key) or "0") + 1)
+        return int(stored[key])
+
+    async def fake_expire(key, secs):
+        expiry[key] = secs
+
+    mock_redis = AsyncMock()
+    mock_redis.ping = AsyncMock()
+    mock_redis.get = AsyncMock(side_effect=fake_get)
+    mock_redis.incr = AsyncMock(side_effect=fake_incr)
+    mock_redis.expire = AsyncMock(side_effect=fake_expire)
+
+    with patch("redis.asyncio.from_url", return_value=mock_redis):
+        store = ConversationStore(redis_url="redis://localhost")
+
+        assert await store.get_daily_usage("u1") == 0
+        count = await store.increment_daily_usage("u1")
+        assert count == 1
+
+        key = f"usage:{today}:u1"
+        assert expiry.get(key) == 90000
+
+        count = await store.increment_daily_usage("u1")
+        assert count == 2
+        # expire only called on first increment (count == 1)
+        assert mock_redis.expire.call_count == 1

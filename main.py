@@ -30,7 +30,31 @@ def _configure_logging() -> None:
     root.handlers = [handler]
 
 
+def _init_sentry() -> None:
+    dsn = os.getenv("SENTRY_DSN")
+    if not dsn:
+        return
+    _log = logging.getLogger(__name__)
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.starlette import StarletteIntegration
+
+        sentry_sdk.init(
+            dsn=dsn,
+            integrations=[StarletteIntegration(), FastApiIntegration()],
+            traces_sample_rate=0.1,
+        )
+        _log.info("Sentry initialized")
+    except ImportError:
+        _log.warning(
+            "SENTRY_DSN is set but sentry-sdk is not installed; "
+            "run: pip install 'sentry-sdk[fastapi]'"
+        )
+
+
 _configure_logging()
+_init_sentry()
 logger = logging.getLogger(__name__)
 
 

@@ -1,0 +1,12 @@
+.git
+.env
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.ruff_cache
+tests/
+*.md
+docker-compose.yml
+requirements-dev*.txt
+requirements*.in

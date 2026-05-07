@@ -1,5 +1,6 @@
 import logging
 
+from app.config import get_settings
 from app.memory.store import get_store
 from app.services.openai_service import chat_completion
 
@@ -30,11 +31,25 @@ SYSTEM_PROMPT = """You are Clawbot, a friendly and helpful AI assistant on LINE.
 FALLBACK_MESSAGE = "Sorry, I'm having trouble responding right now. Please try again."
 
 
+def _trim_history(history: list, max_tokens: int) -> list:
+    """Keep the most recent messages within an approximate token budget (4 chars ≈ 1 token)."""
+    total = 0
+    trimmed = []
+    for msg in reversed(history):
+        total += len(msg.get("content", "")) // 4 + 1
+        if total > max_tokens:
+            break
+        trimmed.insert(0, msg)
+    return trimmed
+
+
 async def get_ai_reply(user_id: str, user_message: str) -> str:
     store = get_store()
+    settings = get_settings()
     try:
         await store.add_message(user_id, "user", user_message)
         history = await store.get_history(user_id)
+        history = _trim_history(history, settings.max_context_tokens)
 
         messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history
 

@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     max_history_messages: int = Field(10, validation_alias="MAX_HISTORY_MESSAGES")
     app_env: str = Field("production", validation_alias="APP_ENV")
     redis_url: Optional[str] = Field(None, validation_alias="REDIS_URL")
+    sentry_dsn: Optional[str] = Field(None, validation_alias="SENTRY_DSN")
+    daily_message_limit: int = Field(100, validation_alias="DAILY_MESSAGE_LIMIT")
+    max_context_tokens: int = Field(3500, validation_alias="MAX_CONTEXT_TOKENS")
 
     model_config = {"env_file": ".env", "case_sensitive": False, "populate_by_name": True}
 

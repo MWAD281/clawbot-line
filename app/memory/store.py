@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 from collections import defaultdict, deque
@@ -8,8 +9,8 @@ logger = logging.getLogger(__name__)
 
 class ConversationStore:
     """
-    Conversation history store.  Uses Redis when REDIS_URL is set (24h TTL per
-    user); falls back to an in-process defaultdict when Redis is unavailable.
+    Conversation history and usage store.  Uses Redis when REDIS_URL is set (24h TTL
+    per user); falls back to an in-process defaultdict when Redis is unavailable.
     """
 
     def __init__(self, max_history: int = 10, redis_url: Optional[str] = None):
@@ -17,6 +18,7 @@ class ConversationStore:
         self._redis_url = redis_url
         self._redis = None
         self._memory: Dict[str, deque] = defaultdict(lambda: deque(maxlen=max_history))
+        self._usage: Dict[str, int] = {}
 
     async def _get_redis(self):
         if not self._redis_url:
@@ -68,6 +70,34 @@ class ConversationStore:
             except Exception as e:
                 logger.warning("Redis delete error: %s", type(e).__name__)
         self._memory[user_id].clear()
+
+    async def get_daily_usage(self, user_id: str) -> int:
+        today = datetime.date.today().isoformat()
+        r = await self._get_redis()
+        if r:
+            key = f"usage:{today}:{user_id}"
+            try:
+                val = await r.get(key)
+                return int(val) if val else 0
+            except Exception as e:
+                logger.warning("Redis usage read error: %s", type(e).__name__)
+        return self._usage.get(f"{today}:{user_id}", 0)
+
+    async def increment_daily_usage(self, user_id: str) -> int:
+        today = datetime.date.today().isoformat()
+        r = await self._get_redis()
+        if r:
+            key = f"usage:{today}:{user_id}"
+            try:
+                count = await r.incr(key)
+                if count == 1:
+                    await r.expire(key, 90000)  # 25h so it safely spans a midnight rollover
+                return count
+            except Exception as e:
+                logger.warning("Redis usage write error: %s", type(e).__name__)
+        mem_key = f"{today}:{user_id}"
+        self._usage[mem_key] = self._usage.get(mem_key, 0) + 1
+        return self._usage[mem_key]
 
 
 _store: Optional[ConversationStore] = None
