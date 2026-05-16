@@ -10,3 +10,4 @@ redis>=4.0
 python-json-logger
 gspread
 google-auth
+apscheduler>=3.10

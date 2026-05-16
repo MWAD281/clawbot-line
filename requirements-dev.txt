@@ -21,6 +21,8 @@ anyio==4.12.1
     #   httpx
     #   openai
     #   starlette
+apscheduler==3.11.2
+    # via -r requirements.in
 async-timeout==5.0.1
     # via
     #   aiohttp
@@ -197,6 +199,8 @@ typing-inspection==0.4.2
     #   fastapi
     #   pydantic
     #   pydantic-settings
+tzlocal==5.3.1
+    # via apscheduler
 urllib3==2.6.3
     # via
     #   line-bot-sdk

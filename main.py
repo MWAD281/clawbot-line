@@ -10,6 +10,7 @@ from slowapi.errors import RateLimitExceeded
 from app.api.health import router as health_router
 from app.api.webhook import router as webhook_router
 from app.limiter import limiter
+from app.config import get_settings
 
 
 def _configure_logging() -> None:
@@ -61,7 +62,16 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Clawbot LINE bot starting up")
+    settings = get_settings()
+    scheduler = None
+    if settings.agents_enabled and settings.app_env != "test":
+        from app.agents.scheduler import build_scheduler
+        scheduler = build_scheduler()
+        scheduler.start()
+        logger.info("Agent scheduler started (%d jobs)", len(scheduler.get_jobs()))
     yield
+    if scheduler and scheduler.running:
+        scheduler.shutdown(wait=False)
     logger.info("Clawbot LINE bot shutting down")
 
 

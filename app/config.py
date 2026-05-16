@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     sentry_dsn: Optional[str] = Field(None, validation_alias="SENTRY_DSN")
     daily_message_limit: int = Field(100, validation_alias="DAILY_MESSAGE_LIMIT")
     max_context_tokens: int = Field(3500, validation_alias="MAX_CONTEXT_TOKENS")
+    tony_line_user_id: str = Field("", validation_alias="TONY_LINE_USER_ID")
+    google_spreadsheet_id: str = Field(
+        "184d7kpY7swRCwSJ_eZi8UtrH2K57U1Wzb2Fc9_ShVC8",
+        validation_alias="GOOGLE_SPREADSHEET_ID",
+    )
+    agents_enabled: bool = Field(True, validation_alias="AGENTS_ENABLED")
 
     model_config = {"env_file": ".env", "case_sensitive": False, "populate_by_name": True}
 

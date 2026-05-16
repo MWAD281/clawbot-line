@@ -76,3 +76,26 @@ async def log_line_message(
 ) -> None:
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, _append_sync, user_id, user_text, bot_reply, response_ms)
+
+
+def get_crm_sheet(sheet_name: str) -> Optional[gspread.Worksheet]:
+    """Return a worksheet by name, or None if unavailable."""
+    client = _get_client()
+    if client is None:
+        return None
+    try:
+        return client.open_by_key(SPREADSHEET_ID).worksheet(sheet_name)
+    except Exception as e:
+        logger.error("Cannot open sheet '%s': %s", sheet_name, type(e).__name__)
+        return None
+
+
+def append_to_sheet(sheet_name: str, row: list) -> None:
+    """Append a row to any CRM sheet."""
+    ws = get_crm_sheet(sheet_name)
+    if ws is None:
+        return
+    try:
+        ws.append_row(row, value_input_option="USER_ENTERED")
+    except Exception as e:
+        logger.warning("append_to_sheet('%s') failed: %s", sheet_name, type(e).__name__)

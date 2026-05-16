@@ -5,7 +5,7 @@ from linebot.v3.messaging import (
     AsyncApiClient,
     AsyncMessagingApi,
     Configuration,
-    FlexMessage,
+    PushMessageRequest,
     ReplyMessageRequest,
     TextMessage,
 )
@@ -83,6 +83,17 @@ def _doc_flex(title: str, subtitle: str, pages: str, url: str, btn_label: str) -
             ],
         },
     }
+
+
+async def push_text(to: str, text: str) -> None:
+    client = get_line_client()
+    try:
+        await client.push_message(
+            PushMessageRequest(to=to, messages=[TextMessage(text=text)])
+        )
+    except Exception as e:
+        logger.error("Failed to send LINE push: %s", type(e).__name__)
+        raise
 
 
 async def reply_catalog(reply_token: str) -> None:
