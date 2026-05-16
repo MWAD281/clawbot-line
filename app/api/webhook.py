@@ -11,8 +11,8 @@ from app.config import get_settings
 from app.core.ai_engine import get_ai_reply
 from app.limiter import limiter
 from app.memory.store import get_store
-from app.services.line_service import reply_catalog, reply_company_profile, reply_text
-from app.services.quote_flow_service import handle_quote_flow, start_quote_flow
+from app.services.line_service import reply_catalog, reply_company_profile, reply_quick, reply_text
+from app.services.quote_flow_service import FlowReply, handle_quote_flow, start_quote_flow
 from app.services.quote_service import create_quotation, parse_quote_command
 from app.services.sheets_service import log_line_message
 
@@ -23,6 +23,13 @@ router = APIRouter()
 @lru_cache
 def _get_parser() -> WebhookParser:
     return WebhookParser(get_settings().line_channel_secret)
+
+
+async def _send_flow_reply(reply_token: str, fr: FlowReply) -> None:
+    if fr.quick_reply:
+        await reply_quick(reply_token, fr.text, fr.quick_reply)
+    else:
+        await reply_text(reply_token, fr.text)
 
 
 async def _handle_message(user_id: str, user_text: str, reply_token: str) -> None:
@@ -69,8 +76,8 @@ async def _handle_message(user_id: str, user_text: str, reply_token: str) -> Non
         flow_reply = await handle_quote_flow(user_id, user_text, store)
         if flow_reply is not None:
             response_ms = int((time.monotonic() - t0) * 1000)
-            await reply_text(reply_token, flow_reply)
-            await log_line_message(user_id, user_text, flow_reply[:80], response_ms)
+            await _send_flow_reply(reply_token, flow_reply)
+            await log_line_message(user_id, user_text, flow_reply.text[:80], response_ms)
             return
 
         # 3. Normal AI reply
@@ -85,7 +92,7 @@ async def _handle_message(user_id: str, user_text: str, reply_token: str) -> Non
             await log_line_message(user_id, user_text, "[PROFILE SENT]", response_ms)
         elif reply.strip() == "[QUOTE_FORM]":
             form_reply = await start_quote_flow(user_id, store)
-            await reply_text(reply_token, form_reply)
+            await _send_flow_reply(reply_token, form_reply)
             await log_line_message(user_id, user_text, "[QUOTE_FORM STARTED]", response_ms)
         else:
             await reply_text(reply_token, reply)
