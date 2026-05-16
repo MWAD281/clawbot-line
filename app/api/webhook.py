@@ -23,8 +23,14 @@ def _get_parser() -> WebhookParser:
     return WebhookParser(get_settings().line_channel_secret)
 
 
-_CATALOG_KW  = {"catalog", "catalogue", "แคต", "แคท", "โบรชัวร์", "brochure", "สินค้าทั้งหมด"}
-_PROFILE_KW  = {"company profile", "โปรไฟล์บริษัท", "ข้อมูลบริษัท", "profile บริษัท", "เกี่ยวกับบริษัท"}
+_CATALOG_KW = {
+    "catalog", "catalogue", "brochure", "price list", "pricelist", "product list",
+    "แคต", "แคท", "โบรชัวร์", "รายการสินค้า", "สินค้าทั้งหมด", "ราคาสินค้า",
+}
+_PROFILE_KW = {
+    "company profile", "about us", "about cerafield", "company info",
+    "โปรไฟล์บริษัท", "ข้อมูลบริษัท", "เกี่ยวกับบริษัท", "ประวัติบริษัท",
+}
 
 def _detect(text: str, keywords: set) -> bool:
     lower = text.lower()
