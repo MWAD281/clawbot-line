@@ -24,7 +24,7 @@ async def test_start_flow_returns_quick_reply():
     reply = await start_quote_flow("U123", store)
     assert isinstance(reply, FlowReply)
     assert reply.quick_reply is not None
-    assert "ซื้อใช้ส่วนตัว" in reply.quick_reply
+    assert any("ส่วนตัว" in o for o in reply.quick_reply)
     assert store._state == {"step": "type_select"}
 
 

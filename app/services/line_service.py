@@ -49,7 +49,7 @@ async def reply_text(reply_token: str, text: str) -> None:
 
 async def reply_quick(reply_token: str, text: str, options: list) -> None:
     """Send a text message with quick reply buttons (max 13 chars per label)."""
-    items = [QuickReplyItem(action=MessageAction(label=o[:13], text=o)) for o in options]
+    items = [QuickReplyItem(action=MessageAction(label=o[:20], text=o)) for o in options]
     client = get_line_client()
     try:
         await client.reply_message(
