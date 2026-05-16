@@ -23,21 +23,6 @@ def _get_parser() -> WebhookParser:
     return WebhookParser(get_settings().line_channel_secret)
 
 
-_CATALOG_KW = {
-    "catalog", "catalogue", "brochure", "price list", "pricelist", "product list",
-    "แคต", "แคท", "โบรชัวร์", "โบว์ชัว", "โบ้ชัว", "โบรชัว",
-    "รายการสินค้า", "สินค้าทั้งหมด", "ราคาสินค้า",
-}
-_PROFILE_KW = {
-    "company profile", "about us", "about cerafield", "company info",
-    "โปรไฟล์บริษัท", "ข้อมูลบริษัท", "เกี่ยวกับบริษัท", "ประวัติบริษัท",
-}
-
-def _detect(text: str, keywords: set) -> bool:
-    lower = text.lower()
-    return any(kw in lower for kw in keywords)
-
-
 async def _handle_message(user_id: str, user_text: str, reply_token: str) -> None:
     """Background task: enforce daily limit, call OpenAI, and send LINE reply."""
     settings = get_settings()
@@ -56,22 +41,20 @@ async def _handle_message(user_id: str, user_text: str, reply_token: str) -> Non
 
     await store.increment_daily_usage(user_id)
 
-    # Shortcut: send documents directly without going through AI
-    if _detect(user_text, _CATALOG_KW):
-        await reply_catalog(reply_token)
-        await log_line_message(user_id, user_text, "[CATALOG SENT]", 0)
-        return
-    if _detect(user_text, _PROFILE_KW):
-        await reply_company_profile(reply_token)
-        await log_line_message(user_id, user_text, "[COMPANY PROFILE SENT]", 0)
-        return
-
     try:
         t0 = time.monotonic()
         reply = await get_ai_reply(user_id, user_text)
-        await reply_text(reply_token, reply)
         response_ms = int((time.monotonic() - t0) * 1000)
-        await log_line_message(user_id, user_text, reply, response_ms)
+
+        if reply.strip() == "[CATALOG]":
+            await reply_catalog(reply_token)
+            await log_line_message(user_id, user_text, "[CATALOG SENT]", response_ms)
+        elif reply.strip() == "[PROFILE]":
+            await reply_company_profile(reply_token)
+            await log_line_message(user_id, user_text, "[PROFILE SENT]", response_ms)
+        else:
+            await reply_text(reply_token, reply)
+            await log_line_message(user_id, user_text, reply, response_ms)
     except Exception as e:
         logger.error("Failed to handle message from %s...: %s", user_id[:8], type(e).__name__)
         try:
