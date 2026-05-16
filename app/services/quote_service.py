@@ -290,19 +290,23 @@ def upload_to_drive(pdf_bytes: bytes, filename: str) -> Optional[str]:
             headers={**headers, "Content-Type": f"multipart/related; boundary={boundary}"},
             content=body, timeout=30,
         )
-        resp.raise_for_status()
+        if not resp.is_success:
+            logger.error("Drive upload HTTP %s: %s", resp.status_code, resp.text[:300])
+            return None
         file_id = resp.json()["id"]
 
         # Share with Tony
-        httpx.post(
+        share_resp = httpx.post(
             f"https://www.googleapis.com/drive/v3/files/{file_id}/permissions",
             headers=headers,
             json={"role": "reader", "type": "user", "emailAddress": OWNER_EMAIL},
             timeout=10,
         )
+        if not share_resp.is_success:
+            logger.warning("Drive share failed HTTP %s: %s", share_resp.status_code, share_resp.text[:200])
         return f"https://drive.google.com/file/d/{file_id}/view"
     except Exception as e:
-        logger.error("Drive upload error: %s", e)
+        logger.error("Drive upload error: %s: %s", type(e).__name__, e)
         return None
 
 
