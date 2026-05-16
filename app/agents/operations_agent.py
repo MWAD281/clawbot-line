@@ -33,6 +33,9 @@ async def run_operations_agent() -> None:
 
         for row in rows:
             sku = str(row.get("SKU", "")).strip()
+            last_updated = str(row.get("Last Updated", "")).strip()
+            if not last_updated:
+                continue  # stock not yet received — skip alert
             try:
                 stock = int(row.get("Stock", 0))
             except (ValueError, TypeError):

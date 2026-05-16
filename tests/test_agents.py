@@ -121,8 +121,8 @@ async def test_operations_agent_no_alert_when_stock_ok(monkeypatch):
 
     mock_ws = MagicMock()
     mock_ws.get_all_records.return_value = [
-        {"SKU": "CF-2495", "Stock": 50},
-        {"SKU": "CF-13022", "Stock": 30},
+        {"SKU": "CF-2495", "Stock": 50, "Last Updated": "16/05/2026"},
+        {"SKU": "CF-13022", "Stock": 30, "Last Updated": "16/05/2026"},
     ]
 
     with (
@@ -144,7 +144,7 @@ async def test_operations_agent_sends_alert_when_low(monkeypatch):
 
     mock_ws = MagicMock()
     mock_ws.get_all_records.return_value = [
-        {"SKU": "CF-2495", "Stock": 3},
+        {"SKU": "CF-2495", "Stock": 3, "Last Updated": "16/05/2026"},
     ]
 
     with (
