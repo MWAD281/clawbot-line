@@ -1,4 +1,5 @@
 import logging
+import time
 from functools import lru_cache
 
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
@@ -11,6 +12,7 @@ from app.core.ai_engine import get_ai_reply
 from app.limiter import limiter
 from app.memory.store import get_store
 from app.services.line_service import reply_text
+from app.services.sheets_service import log_line_message
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -40,8 +42,11 @@ async def _handle_message(user_id: str, user_text: str, reply_token: str) -> Non
     await store.increment_daily_usage(user_id)
 
     try:
+        t0 = time.monotonic()
         reply = await get_ai_reply(user_id, user_text)
         await reply_text(reply_token, reply)
+        response_ms = int((time.monotonic() - t0) * 1000)
+        await log_line_message(user_id, user_text, reply, response_ms)
     except Exception as e:
         logger.error("Failed to handle message from %s...: %s", user_id[:8], type(e).__name__)
         try:
