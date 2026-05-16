@@ -260,6 +260,27 @@ def build_pdf_bytes(qt_no, customer, project, items, subtotal, notes="") -> byte
 
 
 def _drive_creds() -> Optional[Credentials]:
+    # Prefer OAuth2 user credentials (Tony's personal Drive, has quota)
+    refresh_token = os.environ.get("GOOGLE_OAUTH_REFRESH_TOKEN")
+    client_id = os.environ.get("GOOGLE_OAUTH_CLIENT_ID")
+    client_secret = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET")
+    if refresh_token and client_id and client_secret:
+        try:
+            from google.oauth2.credentials import Credentials as UserCredentials
+            creds = UserCredentials(
+                token=None,
+                refresh_token=refresh_token,
+                token_uri="https://oauth2.googleapis.com/token",
+                client_id=client_id,
+                client_secret=client_secret,
+                scopes=["https://www.googleapis.com/auth/drive.file"],
+            )
+            creds.refresh(Request())
+            return creds
+        except Exception as e:
+            logger.error("OAuth2 user creds error: %s", e)
+
+    # Fallback: service account (only works with Shared Drives)
     creds_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
     if not creds_json:
         return None
@@ -268,7 +289,7 @@ def _drive_creds() -> Optional[Credentials]:
         creds.refresh(Request())
         return creds
     except Exception as e:
-        logger.error("Drive creds error: %s", e)
+        logger.error("Drive service account creds error: %s", e)
         return None
 
 
