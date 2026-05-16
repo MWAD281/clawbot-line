@@ -12,6 +12,7 @@ from app.core.ai_engine import get_ai_reply
 from app.limiter import limiter
 from app.memory.store import get_store
 from app.services.line_service import reply_catalog, reply_company_profile, reply_text
+from app.services.quote_service import create_quotation, parse_quote_command
 from app.services.sheets_service import log_line_message
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,33 @@ async def _handle_message(user_id: str, user_text: str, reply_token: str) -> Non
 
     try:
         t0 = time.monotonic()
+
+        if user_text.strip().lower().startswith("/quote"):
+            parsed = parse_quote_command(user_text)
+            if not parsed or not parsed.get("items"):
+                await reply_text(reply_token, "รูปแบบคำสั่ง: /quote ชื่อลูกค้า [/ โปรเจกต์], SKU x จำนวน\nตัวอย่าง: /quote Holiday Inn / ห้อง 201, CF-13022 x10, CF-600 x5")
+                return
+            result = await create_quotation(parsed["customer"], parsed["project"], parsed["items"])
+            response_ms = int((time.monotonic() - t0) * 1000)
+            lines = "\n".join(
+                f"  {it['sku']} x{it['qty']}  {it['amount']:,.0f} บาท"
+                for it in result["items"]
+            )
+            drive_line = f"\nPDF: {result['drive_url']}" if result.get("drive_url") else ""
+            reply = (
+                f"ใบเสนอราคา {result['qt_no']}\n"
+                f"ลูกค้า: {result['customer']}"
+                + (f"\nโปรเจกต์: {result['project']}" if result.get("project") else "")
+                + f"\n\n{lines}\n\n"
+                f"Subtotal: {result['subtotal']:,.0f} บาท\n"
+                f"VAT 7%:  {result['vat']:,.0f} บาท\n"
+                f"รวม:     {result['total']:,.0f} บาท"
+                f"{drive_line}"
+            )
+            await reply_text(reply_token, reply)
+            await log_line_message(user_id, user_text, f"[QUOTE {result['qt_no']}]", response_ms)
+            return
+
         reply = await get_ai_reply(user_id, user_text)
         response_ms = int((time.monotonic() - t0) * 1000)
 
