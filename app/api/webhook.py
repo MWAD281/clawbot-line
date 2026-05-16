@@ -25,7 +25,8 @@ def _get_parser() -> WebhookParser:
 
 _CATALOG_KW = {
     "catalog", "catalogue", "brochure", "price list", "pricelist", "product list",
-    "แคต", "แคท", "โบรชัวร์", "รายการสินค้า", "สินค้าทั้งหมด", "ราคาสินค้า",
+    "แคต", "แคท", "โบรชัวร์", "โบว์ชัว", "โบ้ชัว", "โบรชัว",
+    "รายการสินค้า", "สินค้าทั้งหมด", "ราคาสินค้า",
 }
 _PROFILE_KW = {
     "company profile", "about us", "about cerafield", "company info",
