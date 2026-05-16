@@ -11,7 +11,7 @@ from app.config import get_settings
 from app.core.ai_engine import get_ai_reply
 from app.limiter import limiter
 from app.memory.store import get_store
-from app.services.line_service import reply_text
+from app.services.line_service import reply_catalog, reply_company_profile, reply_text
 from app.services.sheets_service import log_line_message
 
 logger = logging.getLogger(__name__)
@@ -21,6 +21,14 @@ router = APIRouter()
 @lru_cache
 def _get_parser() -> WebhookParser:
     return WebhookParser(get_settings().line_channel_secret)
+
+
+_CATALOG_KW  = {"catalog", "แคตตาล็อก", "catalogue", "โบรชัวร์", "brochure", "สินค้าทั้งหมด"}
+_PROFILE_KW  = {"company profile", "โปรไฟล์บริษัท", "ข้อมูลบริษัท", "profile บริษัท", "เกี่ยวกับบริษัท"}
+
+def _detect(text: str, keywords: set) -> bool:
+    lower = text.lower()
+    return any(kw in lower for kw in keywords)
 
 
 async def _handle_message(user_id: str, user_text: str, reply_token: str) -> None:
@@ -40,6 +48,16 @@ async def _handle_message(user_id: str, user_text: str, reply_token: str) -> Non
         return
 
     await store.increment_daily_usage(user_id)
+
+    # Shortcut: send documents directly without going through AI
+    if _detect(user_text, _CATALOG_KW):
+        await reply_catalog(reply_token)
+        await log_line_message(user_id, user_text, "[CATALOG SENT]", 0)
+        return
+    if _detect(user_text, _PROFILE_KW):
+        await reply_company_profile(reply_token)
+        await log_line_message(user_id, user_text, "[COMPANY PROFILE SENT]", 0)
+        return
 
     try:
         t0 = time.monotonic()
