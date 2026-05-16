@@ -23,6 +23,7 @@ class Settings(BaseSettings):
         validation_alias="GOOGLE_SPREADSHEET_ID",
     )
     agents_enabled: bool = Field(True, validation_alias="AGENTS_ENABLED")
+    drive_folder_id: str = Field("", validation_alias="DRIVE_FOLDER_ID")
 
     model_config = {"env_file": ".env", "case_sensitive": False, "populate_by_name": True}
 

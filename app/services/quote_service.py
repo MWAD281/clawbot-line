@@ -278,16 +278,21 @@ def upload_to_drive(pdf_bytes: bytes, filename: str) -> tuple[Optional[str], Opt
     if creds is None:
         return None, "Drive creds failed (GOOGLE_CREDENTIALS_JSON missing or invalid)"
     try:
+        from app.config import get_settings
+        folder_id = get_settings().drive_folder_id
         headers = {"Authorization": f"Bearer {creds.token}"}
         boundary = "cerafield_qt_boundary"
-        metadata = json.dumps({"name": filename})
+        meta: dict = {"name": filename}
+        if folder_id:
+            meta["parents"] = [folder_id]
+        metadata = json.dumps(meta)
         body = (
             f"--{boundary}\r\nContent-Type: application/json\r\n\r\n{metadata}\r\n"
             f"--{boundary}\r\nContent-Type: application/pdf\r\n\r\n"
         ).encode() + pdf_bytes + f"\r\n--{boundary}--".encode()
 
         resp = httpx.post(
-            "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+            "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true",
             headers={**headers, "Content-Type": f"multipart/related; boundary={boundary}"},
             content=body, timeout=30,
         )
