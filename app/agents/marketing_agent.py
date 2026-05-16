@@ -3,7 +3,7 @@ from datetime import date
 
 from app.config import get_settings
 from app.services.openai_service import create_completion
-from app.services.sheets_service import get_crm_sheet, append_to_sheet
+from app.services.sheets_service import append_to_sheet
 from app.services.line_service import push_text
 
 logger = logging.getLogger(__name__)
