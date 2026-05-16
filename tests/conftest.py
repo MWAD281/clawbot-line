@@ -61,8 +61,9 @@ def reset_singletons():
 
 @pytest.fixture
 def mock_line_reply():
-    """Patch reply_text at the webhook module where it was imported."""
-    with patch("app.api.webhook.reply_text", new_callable=AsyncMock) as mock:
+    """Patch reply_text and log_line_message at the webhook module."""
+    with patch("app.api.webhook.reply_text", new_callable=AsyncMock) as mock, \
+         patch("app.api.webhook.log_line_message", new_callable=AsyncMock):
         yield mock
 
 
