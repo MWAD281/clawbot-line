@@ -85,37 +85,19 @@ def _doc_flex(title: str, subtitle: str, pages: str, url: str, btn_label: str) -
     }
 
 
-async def reply_flex(reply_token: str, alt_text: str, bubble: dict) -> None:
-    client = get_line_client()
-    try:
-        await client.reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[FlexMessage(alt_text=alt_text, contents=bubble)],
-            )
-        )
-    except Exception as e:
-        logger.error("Failed to send LINE flex: %s", type(e).__name__)
-        raise
-
-
 async def reply_catalog(reply_token: str) -> None:
-    bubble = _doc_flex(
-        title="Product Catalog 2026",
-        subtitle="รวมสุขภัณฑ์ทุกซีรีส์ของ CERAFIELD — Core, C-Heritage, Lagoons, FLUSSO",
-        pages="37 หน้า  ·  PDF",
-        url=CATALOG_URL,
-        btn_label="เปิดแคตตาล็อก →",
+    text = (
+        "📚 CERAFIELD Product Catalog 2026\n"
+        "รวมสุขภัณฑ์ทุกซีรีส์ — Core, C-Heritage, Lagoons, FLUSSO\n\n"
+        f"🔗 {CATALOG_URL}"
     )
-    await reply_flex(reply_token, "CERAFIELD Catalog 2026", bubble)
+    await reply_text(reply_token, text)
 
 
 async def reply_company_profile(reply_token: str) -> None:
-    bubble = _doc_flex(
-        title="Company Profile 2026",
-        subtitle="CERAFIELD INTERNATIONAL (THAILAND) CO., LTD.\nยกระดับสุขภัณฑ์เป็นโครงสร้างพื้นฐานเพื่อชีวิตที่ดีขึ้น",
-        pages="19 หน้า  ·  PDF",
-        url=PROFILE_URL,
-        btn_label="เปิด Company Profile →",
+    text = (
+        "🏢 CERAFIELD Company Profile 2026\n"
+        "CERAFIELD INTERNATIONAL (THAILAND) CO., LTD.\n\n"
+        f"🔗 {PROFILE_URL}"
     )
-    await reply_flex(reply_token, "CERAFIELD Company Profile 2026", bubble)
+    await reply_text(reply_token, text)
