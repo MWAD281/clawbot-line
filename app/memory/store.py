@@ -19,6 +19,7 @@ class ConversationStore:
         self._redis = None
         self._memory: Dict[str, deque] = defaultdict(lambda: deque(maxlen=max_history))
         self._usage: Dict[str, int] = {}
+        self._quote_flows: Dict[str, dict] = {}
 
     async def _get_redis(self):
         if not self._redis_url:
@@ -82,6 +83,36 @@ class ConversationStore:
             except Exception as e:
                 logger.warning("Redis usage read error: %s", type(e).__name__)
         return self._usage.get(f"{today}:{user_id}", 0)
+
+    async def get_quote_flow(self, user_id: str) -> Optional[dict]:
+        r = await self._get_redis()
+        if r:
+            try:
+                raw = await r.get(f"qflow:{user_id}")
+                return json.loads(raw) if raw else None
+            except Exception:
+                pass
+        return self._quote_flows.get(user_id)
+
+    async def set_quote_flow(self, user_id: str, state: dict) -> None:
+        r = await self._get_redis()
+        if r:
+            try:
+                await r.set(f"qflow:{user_id}", json.dumps(state), ex=1800)
+                return
+            except Exception:
+                pass
+        self._quote_flows[user_id] = state
+
+    async def clear_quote_flow(self, user_id: str) -> None:
+        r = await self._get_redis()
+        if r:
+            try:
+                await r.delete(f"qflow:{user_id}")
+                return
+            except Exception:
+                pass
+        self._quote_flows.pop(user_id, None)
 
     async def increment_daily_usage(self, user_id: str) -> int:
         today = datetime.date.today().isoformat()
