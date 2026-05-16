@@ -56,7 +56,10 @@ async def _handle_message(user_id: str, user_text: str, reply_token: str) -> Non
                 f"  {it['sku']} x{it['qty']}  {it['amount']:,.0f} บาท"
                 for it in result["items"]
             )
-            drive_line = f"\nPDF: {result['drive_url']}" if result.get("drive_url") else "\n(PDF อัพโหลด Drive ไม่สำเร็จ — ตรวจสอบ log)"
+            if result.get("drive_url"):
+                drive_line = f"\nPDF: {result['drive_url']}"
+            else:
+                drive_line = f"\nPDF error: {result.get('drive_error', 'unknown')}"
             reply = (
                 f"ใบเสนอราคา {result['qt_no']}\n"
                 f"ลูกค้า: {result['customer']}"

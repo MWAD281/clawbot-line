@@ -272,10 +272,11 @@ def _drive_creds() -> Optional[Credentials]:
         return None
 
 
-def upload_to_drive(pdf_bytes: bytes, filename: str) -> Optional[str]:
+def upload_to_drive(pdf_bytes: bytes, filename: str) -> tuple[Optional[str], Optional[str]]:
+    """Returns (url, error_msg). url is None on failure; error_msg describes the problem."""
     creds = _drive_creds()
     if creds is None:
-        return None
+        return None, "Drive creds failed (GOOGLE_CREDENTIALS_JSON missing or invalid)"
     try:
         headers = {"Authorization": f"Bearer {creds.token}"}
         boundary = "cerafield_qt_boundary"
@@ -291,23 +292,26 @@ def upload_to_drive(pdf_bytes: bytes, filename: str) -> Optional[str]:
             content=body, timeout=30,
         )
         if not resp.is_success:
-            logger.error("Drive upload HTTP %s: %s", resp.status_code, resp.text[:300])
-            return None
+            msg = f"Drive upload HTTP {resp.status_code}: {resp.text[:200]}"
+            logger.error(msg)
+            return None, msg
         file_id = resp.json()["id"]
 
         # Share with Tony
         share_resp = httpx.post(
             f"https://www.googleapis.com/drive/v3/files/{file_id}/permissions",
             headers=headers,
-            json={"role": "reader", "type": "user", "emailAddress": OWNER_EMAIL},
+            json={"role": "reader", "type": "user", "emailAddress": OWNER_EMAIL,
+                  "sendNotificationEmail": False},
             timeout=10,
         )
         if not share_resp.is_success:
             logger.warning("Drive share failed HTTP %s: %s", share_resp.status_code, share_resp.text[:200])
-        return f"https://drive.google.com/file/d/{file_id}/view"
+        return f"https://drive.google.com/file/d/{file_id}/view", None
     except Exception as e:
-        logger.error("Drive upload error: %s: %s", type(e).__name__, e)
-        return None
+        msg = f"Drive upload exception: {type(e).__name__}: {e}"
+        logger.error(msg)
+        return None, msg
 
 
 async def create_quotation(customer: str, project: str, items: list, notes: str = "") -> dict:
@@ -342,7 +346,7 @@ async def create_quotation(customer: str, project: str, items: list, notes: str 
 
     # Upload to Drive
     filename = f"{qt_no}_{customer[:20].replace(' ', '_')}.pdf"
-    drive_url = upload_to_drive(pdf_bytes, filename)
+    drive_url, drive_error = upload_to_drive(pdf_bytes, filename)
 
     return {
         "qt_no": qt_no,
@@ -353,4 +357,5 @@ async def create_quotation(customer: str, project: str, items: list, notes: str 
         "vat": vat,
         "total": total,
         "drive_url": drive_url,
+        "drive_error": drive_error,
     }

@@ -51,7 +51,7 @@ async def test_create_quotation_returns_dict():
     with (
         patch("app.services.quote_service.get_crm_sheet", return_value=mock_ws),
         patch("app.services.quote_service.append_to_sheet"),
-        patch("app.services.quote_service.upload_to_drive", return_value="https://drive.google.com/test"),
+        patch("app.services.quote_service.upload_to_drive", return_value=("https://drive.google.com/test", None)),
     ):
         from app.services.quote_service import create_quotation
         items = [{"sku": "CF-13022", "qty": 2, "unit_price": 10800, "amount": 21600}]
