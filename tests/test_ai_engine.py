@@ -56,34 +56,16 @@ async def test_history_not_stored_on_failure():
 
 
 @pytest.mark.asyncio
-async def test_tool_call_executes_and_returns_reply():
-    """When the model requests a tool, the engine executes it and loops back for the final reply."""
+async def test_cerafield_reply_returned():
+    """Bot returns AI reply for CERAFIELD product questions."""
     from app.core.ai_engine import get_ai_reply
 
-    # First response: model wants to call get_price
-    tool_call = MagicMock()
-    tool_call.id = "call_abc"
-    tool_call.function.name = "get_price"
-    tool_call.function.arguments = '{"symbol": "BTCUSDT"}'
+    with patch("app.core.ai_engine.create_completion", new_callable=AsyncMock) as mock_chat:
+        mock_chat.return_value = _make_completion_response("CF-12014 เป็นโถส้วม Two Piece ครับ")
+        result = await get_ai_reply("user5", "CF-12014 คืออะไร")
 
-    first_response = MagicMock()
-    first_response.choices[0].finish_reason = "tool_calls"
-    first_response.choices[0].message.content = None
-    first_response.choices[0].message.tool_calls = [tool_call]
-
-    # Second response: model gives final answer after seeing tool result
-    second_response = _make_completion_response("BTC is at $65,000")
-
-    with patch("app.core.ai_engine.create_completion", new_callable=AsyncMock) as mock_chat, \
-         patch("app.services.binance_service.get_price", new_callable=AsyncMock) as mock_price:
-        mock_chat.side_effect = [first_response, second_response]
-        mock_price.return_value = {"symbol": "BTCUSDT", "price": "65000.00"}
-
-        result = await get_ai_reply("user5", "What's the BTC price?")
-
-    assert result == "BTC is at $65,000"
-    assert mock_price.called
-    assert mock_chat.call_count == 2
+    assert "CF-12014" in result
+    assert mock_chat.call_count == 1
 
 
 def test_trim_history_keeps_recent_messages():
