@@ -23,7 +23,7 @@ def _get_parser() -> WebhookParser:
     return WebhookParser(get_settings().line_channel_secret)
 
 
-_CATALOG_KW  = {"catalog", "แคตตาล็อก", "catalogue", "โบรชัวร์", "brochure", "สินค้าทั้งหมด"}
+_CATALOG_KW  = {"catalog", "catalogue", "แคต", "แคท", "โบรชัวร์", "brochure", "สินค้าทั้งหมด"}
 _PROFILE_KW  = {"company profile", "โปรไฟล์บริษัท", "ข้อมูลบริษัท", "profile บริษัท", "เกี่ยวกับบริษัท"}
 
 def _detect(text: str, keywords: set) -> bool:
