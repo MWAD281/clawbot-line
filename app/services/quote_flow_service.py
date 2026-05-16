@@ -102,7 +102,7 @@ async def start_quote_flow(user_id: str, store) -> FlowReply:
     await store.set_quote_flow(user_id, {"step": "type_select"})
     return FlowReply(
         text="ใบเสนอราคาสำหรับอะไรคะ? (พิมพ์ ยกเลิก เพื่อออก)",
-        quick_reply=["ซื้อใช้ส่วนตัว", "งานโปรเจค"],
+        quick_reply=["ใช้ส่วนตัว", "งานโปรเจค"],
     )
 
 
@@ -137,7 +137,7 @@ async def handle_quote_flow(user_id: str, text: str, store) -> Optional[FlowRepl
             )
         return FlowReply(
             text="กรุณาเลือกประเภทค่ะ",
-            quick_reply=["ซื้อใช้ส่วนตัว", "งานโปรเจค"],
+            quick_reply=["ใช้ส่วนตัว", "งานโปรเจค"],
         )
 
     # ── Retail path ─────────────────────────────────────────────────
