@@ -44,6 +44,23 @@ PRICE_LIST: dict[str, float] = {
     "CF-4037": 12800, "CF-U622": 15280,
     "CF-600": 1980, "CF-C425": 21800, "CF-B425": 18880,
     "CF-18004": 12800, "CF-2138": 3080, "CF-S01": 850,
+    "CF-U668": 0, "CF-121004": 0,
+}
+
+# Project pricing: {SKU: (min_qty, project_price)}
+PROJECT_PRICE_LIST: dict[str, tuple] = {
+    "CF-2495":  (100, 4980),
+    "CF-2493":  (100, 4880),
+    "CF-13022": (100, 5880),
+    "CF-12014": (100, 12880),
+    "CF-12016": (100, 16880),
+    "CF-15001": (100, 9580),
+    "CF-15005": (100, 7560),
+    "CF-4037":  (100, 5280),
+    "CF-121004":(100, 5280),
+    "CF-600":   (100, 1380),
+    "CF-U622":  (20,  10280),
+    "CF-U668":  (20,  13860),
 }
 
 
@@ -93,7 +110,12 @@ def parse_quote_command(text: str) -> dict:
                 pass
         else:
             sku = part.upper()
-        unit_price = PRICE_LIST.get(sku, 0.0)
+        # Use project pricing if qty meets the threshold
+        if sku in PROJECT_PRICE_LIST:
+            min_qty, proj_price = PROJECT_PRICE_LIST[sku]
+            unit_price = proj_price if qty >= min_qty else PRICE_LIST.get(sku, 0.0)
+        else:
+            unit_price = PRICE_LIST.get(sku, 0.0)
         items.append({"sku": sku, "qty": qty, "unit_price": unit_price, "amount": unit_price * qty})
 
     return {"customer": customer, "project": project, "items": items}
