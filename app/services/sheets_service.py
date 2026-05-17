@@ -90,9 +90,35 @@ def get_crm_sheet(sheet_name: str) -> Optional[gspread.Worksheet]:
         return None
 
 
+def ensure_sheet(sheet_name: str, headers: list) -> Optional[gspread.Worksheet]:
+    """Return worksheet, creating it with headers if it doesn't exist."""
+    client = _get_client()
+    if client is None:
+        return None
+    ss = client.open_by_key(SPREADSHEET_ID)
+    try:
+        return ss.worksheet(sheet_name)
+    except gspread.exceptions.WorksheetNotFound:
+        pass
+    try:
+        ws = ss.add_worksheet(title=sheet_name, rows=1000, cols=len(headers))
+        ws.append_row(headers, value_input_option="USER_ENTERED")
+        logger.info("Created sheet '%s'", sheet_name)
+        return ws
+    except Exception as e:
+        logger.error("ensure_sheet('%s') failed: %s", sheet_name, e)
+        return None
+
+
+_LEADS_HEADERS = ["Date", "Time", "LINE ID", "Contact Info", "Status", "Notes"]
+
+
 def append_to_sheet(sheet_name: str, row: list) -> None:
-    """Append a row to any CRM sheet."""
-    ws = get_crm_sheet(sheet_name)
+    """Append a row to any CRM sheet, auto-creating the Leads sheet if needed."""
+    if sheet_name == "📋 Leads":
+        ws = ensure_sheet(sheet_name, _LEADS_HEADERS)
+    else:
+        ws = get_crm_sheet(sheet_name)
     if ws is None:
         return
     try:
