@@ -4,6 +4,7 @@ Multi-step LINE quote flow — retail and project paths.
 State stored per user_id in ConversationStore (Redis / in-memory).
 Returns FlowReply(text, quick_reply) so webhook can choose reply_text or reply_quick.
 """
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from typing import List, Optional
@@ -11,6 +12,18 @@ from typing import List, Optional
 from app.services.quote_service import PROJECT_PRICE_LIST, create_quotation, parse_quote_command
 
 logger = logging.getLogger(__name__)
+
+
+def _push_qt_admin(result: dict) -> None:
+    """Fire-and-forget: push QT alert to Tony without blocking the flow reply."""
+    try:
+        from app.config import get_settings
+        from app.services.line_service import push_qt_alert
+        tony_id = get_settings().tony_line_user_id
+        if tony_id:
+            asyncio.create_task(push_qt_alert(tony_id, result))
+    except Exception as e:
+        logger.warning("push_qt_admin error: %s", e)
 
 CANCEL_WORDS = {"ยกเลิก", "cancel", "ออก", "หยุด", "exit"}
 
@@ -226,6 +239,7 @@ async def _handle_confirm(text: str, state: dict, products_step: str, user_id: s
             items = state.get("items", [])
             notes = f"เลขผู้เสียภาษี: {state['tax_id']}" if state.get("tax_id") else ""
             result = await create_quotation(state["customer"], state.get("project", ""), items, notes)
+            _push_qt_admin(result)
             return FlowReply(text=_format_result(result))
         except Exception as e:
             logger.error("Quote flow create_quotation error: %s", e)

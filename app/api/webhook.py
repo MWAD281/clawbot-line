@@ -11,7 +11,8 @@ from app.config import get_settings
 from app.core.ai_engine import get_ai_reply
 from app.limiter import limiter
 from app.memory.store import get_store
-from app.services.line_service import reply_catalog, reply_company_profile, reply_quick, reply_text
+from app.services.line_service import push_qt_alert, reply_catalog, reply_company_profile, reply_quick, reply_text
+from app.services.lead_flow_service import LeadReply, handle_lead_flow, start_lead_flow
 from app.services.quote_flow_service import FlowReply, handle_quote_flow, start_quote_flow
 from app.services.quote_service import create_quotation, parse_quote_command
 from app.services.sheets_service import log_line_message
@@ -30,6 +31,10 @@ async def _send_flow_reply(reply_token: str, fr: FlowReply) -> None:
         await reply_quick(reply_token, fr.text, fr.quick_reply)
     else:
         await reply_text(reply_token, fr.text)
+
+
+async def _send_lead_reply(reply_token: str, lr: LeadReply) -> None:
+    await reply_text(reply_token, lr.text)
 
 
 async def _handle_message(user_id: str, user_text: str, reply_token: str) -> None:
@@ -69,10 +74,20 @@ async def _handle_message(user_id: str, user_text: str, reply_token: str) -> Non
                 + f"\n\n{lines}\n\nSubtotal: {result['subtotal']:,.0f} บาท\nVAT 7%:   {result['vat']:,.0f} บาท\nรวม:      {result['total']:,.0f} บาท{drive_line}"
             )
             await reply_text(reply_token, reply)
+            if settings.tony_line_user_id:
+                await push_qt_alert(settings.tony_line_user_id, result)
             await log_line_message(user_id, user_text, f"[QUOTE {result['qt_no']}]", response_ms)
             return
 
-        # 2. Active quote flow — route all messages through step handler
+        # 2. Active lead flow
+        lead_reply = await handle_lead_flow(user_id, user_text, store)
+        if lead_reply is not None:
+            response_ms = int((time.monotonic() - t0) * 1000)
+            await _send_lead_reply(reply_token, lead_reply)
+            await log_line_message(user_id, user_text, lead_reply.text[:80], response_ms)
+            return
+
+        # 3. Active quote flow — route all messages through step handler
         flow_reply = await handle_quote_flow(user_id, user_text, store)
         if flow_reply is not None:
             response_ms = int((time.monotonic() - t0) * 1000)
@@ -80,7 +95,7 @@ async def _handle_message(user_id: str, user_text: str, reply_token: str) -> Non
             await log_line_message(user_id, user_text, flow_reply.text[:80], response_ms)
             return
 
-        # 3. Normal AI reply
+        # 4. Normal AI reply
         reply = await get_ai_reply(user_id, user_text)
         response_ms = int((time.monotonic() - t0) * 1000)
 
@@ -94,6 +109,10 @@ async def _handle_message(user_id: str, user_text: str, reply_token: str) -> Non
             form_reply = await start_quote_flow(user_id, store)
             await _send_flow_reply(reply_token, form_reply)
             await log_line_message(user_id, user_text, "[QUOTE_FORM STARTED]", response_ms)
+        elif reply.strip() == "[LEAD_FORM]":
+            lr = await start_lead_flow(user_id, store)
+            await _send_lead_reply(reply_token, lr)
+            await log_line_message(user_id, user_text, "[LEAD_FORM STARTED]", response_ms)
         else:
             await reply_text(reply_token, reply)
             await log_line_message(user_id, user_text, reply, response_ms)

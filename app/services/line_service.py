@@ -104,6 +104,25 @@ def _doc_flex(title: str, subtitle: str, pages: str, url: str, btn_label: str) -
     }
 
 
+async def push_qt_alert(to: str, result: dict) -> None:
+    """Push a QT creation summary to the admin LINE user."""
+    if not to:
+        return
+    lines = "\n".join(
+        f"  {i['sku']} x{i['qty']}  {i['amount']:,.0f} บาท" for i in result["items"]
+    )
+    proj_line = f"\nโปรเจค: {result['project']}" if result.get("project") else ""
+    pdf_line = f"\n{result['drive_url']}" if result.get("drive_url") else "\n(PDF ล้มเหลว)"
+    text = (
+        f"📄 QT ใหม่: {result['qt_no']}\n"
+        f"ลูกค้า: {result['customer']}{proj_line}\n\n"
+        f"{lines}\n\n"
+        f"รวม: {result['total']:,.0f} บาท"
+        f"{pdf_line}"
+    )
+    await push_text(to, text)
+
+
 async def push_text(to: str, text: str) -> None:
     client = get_line_client()
     try:

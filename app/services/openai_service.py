@@ -14,7 +14,7 @@ _client: Optional[AsyncOpenAI] = None
 def get_client() -> AsyncOpenAI:
     global _client
     if _client is None:
-        _client = AsyncOpenAI(api_key=get_settings().openai_api_key)
+        _client = AsyncOpenAI(api_key=get_settings().openai_api_key, timeout=20.0)
     return _client
 
 
