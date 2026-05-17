@@ -58,7 +58,14 @@ async def _handle_message(user_id: str, user_text: str, reply_token: str) -> Non
     try:
         t0 = time.monotonic()
 
-        # 1. Power-user shorthand: /quote Customer, SKU x Qty
+        # 1a. Owner shortcut: "Tony QT" → open quote flow immediately
+        if user_text.strip().lower() == "tony qt":
+            form_reply = await start_quote_flow(user_id, store)
+            await _send_flow_reply(reply_token, form_reply)
+            await log_line_message(user_id, user_text, "[QUOTE_FORM STARTED]", 0)
+            return
+
+        # 1b. Power-user shorthand: /quote Customer, SKU x Qty
         if user_text.strip().lower().startswith("/quote"):
             parsed = parse_quote_command(user_text)
             if not parsed or not parsed.get("items"):
