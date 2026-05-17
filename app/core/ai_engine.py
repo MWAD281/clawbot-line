@@ -18,18 +18,29 @@ CERAFIELD INTERNATIONAL (THAILAND) CO., LTD. ก่อตั้งปี 1991
 ## ราคาขายปลีก (บาท, รวม VAT)
 
 โถส้วม One Piece (Core Series):
-- CF-2495: 8,800
-- CF-13022: 10,800
-- CF-2493: 8,580
+- CF-2495: 8,580
+- CF-2493: 8,800
 - CF-2507: 8,580
+- CF-13022: 10,800
+- CF-13006: 10,800
 
 โถส้วม Two Piece:
-- CF-12014 (C-Heritage): White 22,880 / Matt Black หรือ Matt Gray 30,800 (มีเฉพาะโปรเจกต์ 100 ชิ้นขึ้นไป)
-- CF-12016 (Lagoons): White 23,880 / Matt Black หรือ Matt Gray 30,800 (มีเฉพาะโปรเจกต์ 100 ชิ้นขึ้นไป)
+- CF-12014 (C-Heritage): White 22,880 / Matt Black หรือ Matt Gray 30,800 (MOQ 50 ชิ้น)
+- CF-12016 (Lagoons): White 23,880 / Matt Black หรือ Matt Gray 30,800 (MOQ 50 ชิ้น)
+- CF-14003: 10,080
 
-โถส้วม Wall Hung:
-- CF-15001: White 15,880 / Matt Black หรือ Matt Gray 20,880 (มีเฉพาะโปรเจกต์ 100 ชิ้นขึ้นไป)
-- CF-15005: White 10,800 / Matt Black หรือ Matt Gray 14,980 (มีเฉพาะโปรเจกต์ 100 ชิ้นขึ้นไป)
+โถส้วม Wall Hung (CERAFIELD EDITION):
+- CF-15001: White 15,880 / Matt Black, Matt Gray หรือ Matt White 20,880
+- CF-15005: White 10,800 / Matt Black หรือ Matt Gray 14,980
+- CF-15027: White 15,880 / Matt Black หรือ Matt Gray 20,880
+- CF-15026: 10,800
+
+โถส้วมตั้งพื้น:
+- CF-FT06: 12,800
+- CF-FT07 (CERAFIELD EDITION): 15,800
+
+โถส้วมอัจฉริยะ:
+- CF-777: 15,880
 
 โถปัสสาวะ:
 - CF-4037 (Sensor, Core Series): 12,800
@@ -49,11 +60,14 @@ CERAFIELD INTERNATIONAL (THAILAND) CO., LTD. ก่อตั้งปี 1991
 100+ ชิ้น:
 - CF-2495: 4,980 บาท/ชิ้น
 - CF-2493: 4,880 บาท/ชิ้น
+- CF-2507: 4,880 บาท/ชิ้น
 - CF-13022: 5,880 บาท/ชิ้น
+- CF-13006: 5,880 บาท/ชิ้น
 - CF-12014: 12,880 บาท/ชิ้น
 - CF-12016: 16,880 บาท/ชิ้น
 - CF-15001: 9,580 บาท/ชิ้น
 - CF-15005: 7,560 บาท/ชิ้น
+- CF-15027: 9,580 บาท/ชิ้น
 - CF-4037: 5,280 บาท/ชิ้น
 - CF-121004: 5,280 บาท/ชิ้น
 - CF-600: 1,380 บาท/ชิ้น

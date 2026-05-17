@@ -35,7 +35,7 @@ def test_parse_quote_command_unknown_sku():
 def test_parse_quote_command_no_qty():
     result = parse_quote_command("/quote Test Co, CF-2495")
     assert result["items"][0]["qty"] == 1
-    assert result["items"][0]["amount"] == 8800
+    assert result["items"][0]["amount"] == 8580
 
 
 def test_parse_quote_command_empty():
