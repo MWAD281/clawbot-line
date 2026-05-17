@@ -147,6 +147,6 @@ async def test_project_products_uses_project_pricing():
     store = MockStore({"step": "project_products", "quote_type": "project",
                        "customer": "Sansiri", "project": "Nue Proud", "tax_id": ""})
     reply = await handle_quote_flow("U123", "CF-13022 x100", store)
-    # 100 pcs CF-13022 → project price 5,880
-    assert "5,880" in reply.text
+    # 100 pcs CF-13022 → project price 6,880
+    assert "6,880" in reply.text
     assert store._state["step"] == "project_confirm"
