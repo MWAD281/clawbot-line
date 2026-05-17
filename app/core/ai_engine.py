@@ -1,6 +1,7 @@
 import logging
 
 from app.config import get_settings
+from app.knowledge.lookup import build_spec_context
 from app.memory.store import get_store
 from app.services.openai_service import create_completion
 
@@ -176,7 +177,9 @@ async def get_ai_reply(user_id: str, user_message: str) -> str:
         history = await store.get_history(user_id)
         history = _trim_history(history, settings.max_context_tokens)
 
-        messages: list = [{"role": "system", "content": SYSTEM_PROMPT}] + history
+        spec_ctx = build_spec_context(user_message)
+        system_content = SYSTEM_PROMPT + ("\n\n" + spec_ctx if spec_ctx else "")
+        messages: list = [{"role": "system", "content": system_content}] + history
         response = await create_completion(messages)
         reply = response.choices[0].message.content or ""
 

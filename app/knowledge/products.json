@@ -1,0 +1,759 @@
+{
+  "CF-2495": {
+    "category": "one_piece",
+    "name_th": "โถสุขภัณฑ์แบบชิ้นเดียว",
+    "flush": "Siphonic 3/6 ลิตร",
+    "dimensions": "680×360×758 มม.",
+    "drain": "ท่อน้ำทิ้ง 305 มม. ลงพื้น",
+    "seat": "UF soft-close",
+    "fitting": "Cerafield In-house",
+    "colors": ["White"],
+    "list_price": 8580,
+    "project_price": {"min_qty": 100, "price": 4980}
+  },
+  "CF-2507": {
+    "category": "one_piece",
+    "name_th": "โถสุขภัณฑ์แบบชิ้นเดียว",
+    "flush": "Siphonic 3/6 ลิตร",
+    "dimensions": "670×360×725 มม.",
+    "drain": "ท่อน้ำทิ้ง 305 มม. ลงพื้น",
+    "seat": "PP",
+    "fitting": "Cerafield In-house",
+    "colors": ["White"],
+    "list_price": 8580,
+    "project_price": {"min_qty": 100, "price": 4880}
+  },
+  "CF-2493": {
+    "category": "one_piece",
+    "name_th": "โถสุขภัณฑ์แบบชิ้นเดียว",
+    "flush": "Siphonic 3/6 ลิตร",
+    "dimensions": "660×360×760 มม.",
+    "drain": "ท่อน้ำทิ้ง 300 มม. ลงพื้น",
+    "seat": "Sig LF",
+    "fitting": "Cerafield In-house",
+    "colors": ["White"],
+    "list_price": 8800,
+    "project_price": {"min_qty": 100, "price": 4880},
+    "notes": "ท่อน้ำทิ้งขนาด 50 มม. (มาตรฐาน 38 มม.) ลดการอุดตัน เหมาะโปรเจกต์ขนาดใหญ่"
+  },
+  "CF-13022": {
+    "category": "one_piece",
+    "name_th": "โถสุขภัณฑ์แบบชิ้นเดียว",
+    "flush": "Siphonic 3/6 ลิตร",
+    "dimensions": "710×410×450 มม.",
+    "drain": "ท่อน้ำทิ้ง 300 มม. ลงพื้น",
+    "seat": "UF soft-close",
+    "fitting": "Cerafield In-house",
+    "includes": ["CF-S01 (สายฉีดชำระ)"],
+    "colors": ["White"],
+    "list_price": 10800,
+    "project_price": {"min_qty": 100, "price": 5880},
+    "notes": "ที่นั่งกว้างเป็นพิเศษ (410 มม.) เหมาะผู้สูงอายุและคนร่างใหญ่"
+  },
+  "CF-13006": {
+    "category": "one_piece",
+    "name_th": "โถสุขภัณฑ์แบบชิ้นเดียว",
+    "flush": "Siphonic 3/6 ลิตร",
+    "dimensions": "695×375×735 มม.",
+    "drain": "ท่อน้ำทิ้ง 300 มม. ลงพื้น",
+    "seat": "UF soft-close",
+    "fitting": "Cerafield In-house",
+    "includes": ["สายน้ำดี", "ปะเก็น", "ชุดสายฉีด 304"],
+    "colors": ["White"],
+    "list_price": 10800,
+    "project_price": {"min_qty": 100, "price": 6980}
+  },
+  "CF-13021": {
+    "category": "one_piece",
+    "name_th": "โถสุขภัณฑ์แบบชิ้นเดียว",
+    "flush": "Siphonic 3/6 ลิตร",
+    "dimensions": "670×380×760 มม.",
+    "drain": "ท่อน้ำทิ้ง 304 มม.",
+    "seat": "Sig LF",
+    "includes": ["ชุดสายฉีด 304"],
+    "colors": ["White"],
+    "list_price": null
+  },
+  "CF-11001": {
+    "category": "one_piece",
+    "name_th": "โถสุขภัณฑ์แบบชิ้นเดียว Washdown",
+    "flush": "Washdown 3/6 ลิตร",
+    "dimensions": "670×375×785 มม.",
+    "drain": "ท่อน้ำทิ้ง 180 มม. ออกผนัง",
+    "seat": "Sig LF",
+    "includes": ["ชุดสายฉีด 304"],
+    "colors": ["White"],
+    "list_price": null
+  },
+  "CF-14003": {
+    "category": "two_piece",
+    "name_th": "โถสุขภัณฑ์แบบสองชิ้น",
+    "flush": "Siphonic 6 ลิตร (single flush)",
+    "dimensions": "680×380×750 มม.",
+    "drain": "ท่อน้ำทิ้ง 305 มม. ลงพื้น",
+    "seat": "UF soft-close",
+    "fitting": "Cerafield In-house",
+    "colors": ["White"],
+    "list_price": 10080
+  },
+  "CF-12014": {
+    "category": "two_piece",
+    "series": "C-Heritage",
+    "name_th": "โถสุขภัณฑ์แบบสองชิ้น CERAFIELD EDITION",
+    "flush": "Tornado 3/6 ลิตร",
+    "dimensions": "635×360×850 มม.",
+    "drain": "ท่อออกผนัง 180 มม. / ลงพื้น 250 มม.",
+    "seat": "UF",
+    "fitting": "Advance R&T Performance",
+    "includes": ["CF-S01"],
+    "colors": {
+      "White": {"list_price": 22880, "project_price": {"min_qty": 100, "price": 12880}},
+      "Matt Black": {"list_price": 30800, "moq": 50},
+      "Matt Gray": {"list_price": 30800, "moq": 50},
+      "Matt White": {"list_price": 30800, "moq": 50}
+    }
+  },
+  "CF-12016": {
+    "category": "two_piece",
+    "series": "Lagoons",
+    "name_th": "โถสุขภัณฑ์แบบสองชิ้น CERAFIELD EDITION",
+    "flush": "Tornado 3/6 ลิตร",
+    "dimensions": "630×360×845 มม.",
+    "drain": "ท่อออกผนัง 180 มม. / ลงพื้น 250 มม.",
+    "seat": "UF",
+    "fitting": "Advance R&T Performance",
+    "includes": ["CF-S01"],
+    "colors": {
+      "White": {"list_price": 23880, "project_price": {"min_qty": 100, "price": 16880}},
+      "Matt Black": {"list_price": 30800, "moq": 50},
+      "Matt Gray": {"list_price": 30800, "moq": 50},
+      "Matt White": {"list_price": 30800, "moq": 50}
+    }
+  },
+  "CF-2510": {
+    "category": "two_piece",
+    "series": "TRAFFIXPRO",
+    "name_th": "โถสุขภัณฑ์แรงดันสูง",
+    "flush": "Siphonic Pressure Assist 3 ลิตร",
+    "dimensions": "754×734 มม.",
+    "colors": ["White"],
+    "list_price": 16480
+  },
+  "CF-2511": {
+    "category": "two_piece",
+    "series": "TRAFFIXPRO",
+    "name_th": "โถสุขภัณฑ์แรงดันสูง",
+    "flush": "Siphonic Pressure Assist 3 ลิตร",
+    "colors": ["White"],
+    "list_price": 16480
+  },
+  "CF-24002": {
+    "category": "two_piece",
+    "name_th": "โถสุขภัณฑ์แบบสองชิ้น Washdown",
+    "flush": "Washdown 3/6 ลิตร",
+    "dimensions": "630×380×820 มม.",
+    "drain": "ท่อน้ำทิ้ง 180 มม.",
+    "fitting": "Advance R&T Performance",
+    "colors": ["White"],
+    "list_price": 12840
+  },
+  "CF-24003": {
+    "category": "two_piece",
+    "name_th": "โถสุขภัณฑ์แบบสองชิ้น Washdown",
+    "flush": "Washdown 3/6 ลิตร",
+    "dimensions": "630×380×820 มม.",
+    "drain": "ท่อน้ำทิ้ง 180 มม.",
+    "colors": ["White"],
+    "list_price": 12840
+  },
+  "CF-777": {
+    "category": "smart_toilet",
+    "name_th": "โถสุขภัณฑ์อัจฉริยะ HYDRO-MECHANICAL",
+    "flush": "Siphonic 4 ลิตร",
+    "dimensions": "671×405×450 มม.",
+    "drain": "ท่อน้ำทิ้ง 300 มม.",
+    "colors": ["White"],
+    "list_price": 15880,
+    "notes": "ระบบไฮโดร-เมคานิค ไม่ต้องใช้ไฟฟ้า"
+  },
+  "CF-15001": {
+    "category": "wall_hung",
+    "series": "CERAFIELD EDITION",
+    "name_th": "โถสุขภัณฑ์แบบแขวนผนัง",
+    "flush": "Tornado 3/6 ลิตร",
+    "drain": "ท่อออกผนัง 80 มม.",
+    "includes": ["CF-S01"],
+    "colors": {
+      "White": {"dimensions": "500×360×310 มม.", "list_price": 15880, "project_price": {"min_qty": 100, "price": 9580}},
+      "Matt Black": {"dimensions": "495×360×310 มม.", "list_price": 20880},
+      "Matt Gray": {"dimensions": "495×360×310 มม.", "list_price": 20880},
+      "Matt White": {"dimensions": "495×360×310 มม.", "list_price": 20880}
+    }
+  },
+  "CF-15005": {
+    "category": "wall_hung",
+    "name_th": "โถสุขภัณฑ์แบบแขวนผนัง",
+    "flush": "Washdown 3/6 ลิตร",
+    "dimensions": "490×360×355 มม.",
+    "drain": "ท่อออกผนัง 180 มม.",
+    "fitting": "ชุดสายฉีด 304",
+    "colors": {
+      "White": {"list_price": 10800, "project_price": {"min_qty": 100, "price": 7560}},
+      "Matt Black": {"list_price": 14980},
+      "Matt Gray": {"list_price": 14980}
+    }
+  },
+  "CF-15026": {
+    "category": "wall_hung",
+    "name_th": "โถสุขภัณฑ์แบบแขวนผนัง",
+    "flush": "Washdown 3/6 ลิตร",
+    "dimensions": "520×370×370 มม.",
+    "drain": "ท่อออกผนัง 180 มม.",
+    "fitting": "ชุดสายฉีด 304",
+    "colors": ["White"],
+    "list_price": 10800
+  },
+  "CF-15027": {
+    "category": "wall_hung",
+    "series": "CERAFIELD EDITION",
+    "name_th": "โถสุขภัณฑ์แบบแขวนผนัง",
+    "flush": "Tornado 3/6 ลิตร",
+    "dimensions": "520×360×355 มม.",
+    "drain": "ท่อออกผนัง 180 มม.",
+    "seat": "UF",
+    "includes": ["CF-S01"],
+    "colors": {
+      "White": {"list_price": 15880, "project_price": {"min_qty": 100, "price": 13880}},
+      "Matt Black": {"list_price": 20880, "project_price": {"min_qty": 100, "price": 18880}},
+      "Matt Gray": {"list_price": 20880, "project_price": {"min_qty": 100, "price": 18880}}
+    }
+  },
+  "CF-15003": {
+    "category": "wall_hung",
+    "name_th": "โถสุขภัณฑ์แบบแขวนผนัง",
+    "flush": "Washdown 3/6 ลิตร",
+    "dimensions": "520×360×360 มม.",
+    "drain": "ท่อออกผนัง 180 มม.",
+    "fitting": "ชุดสายฉีด 304",
+    "colors": {
+      "White": {"list_price": 10800},
+      "Matt Black": {"list_price": 14980},
+      "Matt Gray": {"list_price": 14980},
+      "Matt White": {"list_price": 14980}
+    }
+  },
+  "CF-15028": {
+    "category": "wall_hung",
+    "name_th": "โถสุขภัณฑ์แบบแขวนผนัง",
+    "flush": "Tornado 3/6 ลิตร",
+    "dimensions": "520×375×395 มม.",
+    "drain": "ท่อออกผนัง 180 มม.",
+    "colors": {
+      "White": {"list_price": 15880},
+      "Matt Black": {"list_price": 20880},
+      "Matt Gray": {"list_price": 20880}
+    }
+  },
+  "CF-FT06": {
+    "category": "floor_standing",
+    "name_th": "โถสุขภัณฑ์แบบตั้งพื้น",
+    "flush": "Washdown 3/6 ลิตร",
+    "dimensions": "520×370×420 มม.",
+    "drain": "ท่อออกผนัง 180 มม.",
+    "seat": "UF",
+    "fitting": "ชุดสายฉีด 304",
+    "colors": ["White"],
+    "list_price": 12800,
+    "project_price": {"min_qty": 100, "price": 9780}
+  },
+  "CF-FT07": {
+    "category": "floor_standing",
+    "series": "CERAFIELD EDITION",
+    "name_th": "โถสุขภัณฑ์แบบตั้งพื้น",
+    "flush": "Tornado 3/6 ลิตร",
+    "dimensions": "500×360×410 มม.",
+    "drain": "ท่อออกผนัง 180 มม.",
+    "seat": "UF",
+    "includes": ["CF-S01"],
+    "colors": ["White"],
+    "list_price": 15800,
+    "project_price": {"min_qty": 100, "price": 12880}
+  },
+  "CF-2105": {
+    "category": "floor_standing",
+    "series": "TRAFFIXPRO",
+    "name_th": "โถสุขภัณฑ์แบบตั้งพื้น Valve Washdown",
+    "flush": "Valve Washdown 4.8 ลิตร (single)",
+    "dimensions": "725×390×370 มม.",
+    "drain": "ท่อลงพื้น 305 มม.",
+    "seat": "PP",
+    "includes": ["วาล์วก", "กันกลิ่น"],
+    "colors": ["White"],
+    "notes": "อยู่ระหว่างขอ มอก."
+  },
+  "CF-4037": {
+    "category": "urinal",
+    "series": "Sensor Core Series",
+    "name_th": "โถปัสสาวะชาย แบบเซ็นเซอร์",
+    "dimensions": "300×300×690 มม.",
+    "drain": "ท่อระบาย 520 มม.",
+    "includes": ["เซ็นเซอร์อัตโนมัติ", "ท่อ", "เสาน้ำ"],
+    "colors": ["White"],
+    "list_price": 12800,
+    "project_price": {"min_qty": 100, "price": 5280}
+  },
+  "CF-U622": {
+    "category": "urinal",
+    "name_th": "โถปัสสาวะชาย",
+    "colors": ["White"],
+    "list_price": 15280,
+    "project_price": {"min_qty": 20, "price": 10280}
+  },
+  "CF-U668": {
+    "category": "urinal",
+    "name_th": "โถปัสสาวะชาย",
+    "colors": ["White"],
+    "project_price": {"min_qty": 20, "price": 13860}
+  },
+  "CF-4043": {
+    "category": "urinal",
+    "name_th": "โถปัสสาวะชาย แบบเซ็นเซอร์",
+    "dimensions": "380×360×760 มม.",
+    "includes": ["เซ็นเซอร์อัตโนมัติ", "ท่อ", "เสาน้ำ"],
+    "list_price": 12800
+  },
+  "CF-4036": {
+    "category": "urinal",
+    "name_th": "โถปัสสาวะชาย แบบเซ็นเซอร์ (สูง)",
+    "dimensions": "300×380×950 มม.",
+    "list_price": 15800
+  },
+  "CF-4045": {
+    "category": "urinal",
+    "name_th": "โถปัสสาวะชาย",
+    "dimensions": "300×380×760 มม.",
+    "list_price": 15800
+  },
+  "CF-4006": {
+    "category": "urinal",
+    "series": "TRAFFIXPRO",
+    "name_th": "โถปัสสาวะชาย แบบราด",
+    "dimensions": "460×313×710 มม.",
+    "includes": ["ท่อ", "เสา", "วาล์ว"],
+    "list_price": 6600
+  },
+  "CF-4017": {
+    "category": "urinal",
+    "name_th": "โถปัสสาวะชาย (เล็ก)",
+    "dimensions": "300×313×710 มม.",
+    "drain": "ท่อระบาย 520 มม.",
+    "list_price": 9950
+  },
+  "CF-18004": {
+    "category": "basin_wall",
+    "name_th": "อ่างล้างหน้าแบบแขวนผนัง",
+    "dimensions": "450×420 มม.",
+    "mount": "แขวนผนัง",
+    "includes": ["สะดือเซรามิก"],
+    "colors": ["White"],
+    "list_price": 12800,
+    "project_price": {"min_qty": 100, "price": 5280}
+  },
+  "CF-18028": {
+    "category": "basin_wall",
+    "name_th": "อ่างล้างหน้าแบบแขวนผนัง",
+    "dimensions": "505×465 มม.",
+    "mount": "แขวนผนัง",
+    "includes": ["สะดือเซรามิก"],
+    "colors": ["White"],
+    "list_price": 10800
+  },
+  "CF-1880L": {
+    "category": "basin_wall",
+    "name_th": "อ่างล้างหน้าแบบแขวนผนัง",
+    "dimensions": "600×500×140 มม.",
+    "mount": "แขวนผนัง",
+    "includes": ["สะดือเซรามิก"],
+    "colors": ["White"],
+    "list_price": 5800
+  },
+  "CF-1992": {
+    "category": "basin_wall",
+    "name_th": "อ่างล้างหน้าแบบแขวนผนัง",
+    "dimensions": "500×400×155 มม.",
+    "mount": "แขวนผนัง",
+    "includes": ["สะดือเซรามิก"],
+    "colors": ["White"],
+    "list_price": 5800
+  },
+  "CF-21052": {
+    "category": "basin_countertop",
+    "name_th": "อ่างล้างหน้าแบบวางบนเคาน์เตอร์",
+    "dimensions": "500×400×110 มม.",
+    "mount": "วางบนเคาน์เตอร์",
+    "includes": ["สะดือเซรามิก"],
+    "colors": ["White"],
+    "list_price": null
+  },
+  "CF-21034": {
+    "category": "basin_countertop",
+    "name_th": "อ่างล้างหน้าแบบวางบนเคาน์เตอร์ (กลม)",
+    "dimensions": "360×360×120 มม.",
+    "mount": "วางบนเคาน์เตอร์",
+    "includes": ["สะดือเซรามิก"],
+    "colors": {
+      "White": {"list_price": null, "notes": "ดูราคาจากรุ่น CF-21052"},
+      "Matt Black": {"list_price": 8580, "moq": 50},
+      "Matt Gray": {"list_price": 8580, "moq": 50},
+      "Matt White": {"list_price": 8580, "moq": 50}
+    }
+  },
+  "CF-21125": {
+    "category": "basin_countertop",
+    "name_th": "อ่างล้างหน้าแบบวางบนเคาน์เตอร์ (กลม ใหญ่)",
+    "dimensions": "420×420×140 มม.",
+    "mount": "วางบนเคาน์เตอร์",
+    "colors": {
+      "White": {"list_price": 5280},
+      "Matt Black": {"list_price": 9080, "moq": 50},
+      "Matt Gray": {"list_price": 9080, "moq": 50},
+      "Matt White": {"list_price": 9080, "moq": 50}
+    }
+  },
+  "CF-21129": {
+    "category": "basin_countertop",
+    "name_th": "อ่างล้างหน้าแบบวางบนเคาน์เตอร์ (กลม)",
+    "dimensions": "430×430×130 มม.",
+    "mount": "วางบนเคาน์เตอร์",
+    "colors": {
+      "White": {"list_price": 5280},
+      "Matt Black": {"list_price": 8880, "moq": 50},
+      "Matt Gray": {"list_price": 8880, "moq": 50},
+      "Matt White": {"list_price": 8880, "moq": 50}
+    }
+  },
+  "CF-21124": {
+    "category": "basin_countertop",
+    "name_th": "อ่างล้างหน้าแบบวางบนเคาน์เตอร์ (สี่เหลี่ยม)",
+    "dimensions": "585×380×140 มม.",
+    "mount": "วางบนเคาน์เตอร์",
+    "colors": {
+      "White": {"list_price": 5280},
+      "Matt Black": {"list_price": 9280, "moq": 50},
+      "Matt Gray": {"list_price": 9280, "moq": 50},
+      "Matt White": {"list_price": 9280, "moq": 50}
+    }
+  },
+  "CF-21125": {
+    "category": "basin_countertop",
+    "name_th": "อ่างล้างหน้าแบบวางบนเคาน์เตอร์ (กลม)",
+    "dimensions": "420×420×140 มม.",
+    "mount": "วางบนเคาน์เตอร์",
+    "colors": {
+      "White": {"list_price": 5280},
+      "Matt Black": {"list_price": 9080, "moq": 50},
+      "Matt Gray": {"list_price": 9080, "moq": 50},
+      "Matt White": {"list_price": 9080, "moq": 50}
+    }
+  },
+  "CF-20018": {
+    "category": "basin_pedestal",
+    "series": "TRAFFIXPRO",
+    "name_th": "อ่างล้างหน้าแบบตั้งพื้น",
+    "dimensions": "430×360×780 มม.",
+    "mount": "ตั้งพื้น",
+    "includes": ["ขาตั้ง"],
+    "colors": ["White"],
+    "list_price": 3880
+  },
+  "CF-20020": {
+    "category": "basin_pedestal",
+    "series": "TRAFFIXPRO",
+    "name_th": "อ่างล้างหน้าแบบตั้งพื้น (ใหญ่)",
+    "dimensions": "530×450×840 มม.",
+    "mount": "ตั้งพื้น",
+    "includes": ["ขาตั้ง"],
+    "colors": ["White"],
+    "list_price": 3880
+  },
+  "CF-200007H": {
+    "category": "basin_half_pedestal",
+    "name_th": "อ่างล้างหน้าพร้อมขาครึ่งตัว",
+    "dimensions": "450×500 มม.",
+    "includes": ["ขาตั้ง"],
+    "list_price": 3180
+  },
+  "CF-200061H": {
+    "category": "basin_half_pedestal",
+    "name_th": "อ่างล้างหน้าพร้อมขาครึ่งตัว",
+    "dimensions": "410×460 มม.",
+    "includes": ["ขาตั้ง"],
+    "list_price": 3180
+  },
+  "CF-121002CP": {
+    "category": "faucet",
+    "name_th": "ก๊อกอ่างล้างหน้าแบบอัจฉริยะ",
+    "dimensions": "35×130×141 มม.",
+    "material": "ทองเหลืองและซิงค์อัลลอย ชุบโครเมียม",
+    "system": "เซ็นเซอร์อัตโนมัติ",
+    "valve": "เซรามิก 25 มม.",
+    "water": "รองรับน้ำร้อน-เย็น",
+    "list_price": 8880,
+    "project_price": {"min_qty": 100, "price": 5580}
+  },
+  "CF-25008": {
+    "category": "concealed_cistern",
+    "name_th": "ถังเก็บน้ำแบบซ่อน (Concealed Cistern)",
+    "list_price": 10880,
+    "panel_prices": {"ABS": 3000, "Glass": 4000}
+  },
+  "CF-25009": {
+    "category": "concealed_cistern",
+    "name_th": "ถังเก็บน้ำแบบซ่อน (Concealed Cistern)",
+    "list_price": 10880,
+    "panel_prices": {"ABS": 3000, "Glass": 4280}
+  },
+  "CF-25010": {
+    "category": "concealed_cistern",
+    "name_th": "ถังเก็บน้ำแบบซ่อน (Concealed Cistern) CE",
+    "list_price": 12800,
+    "panel_prices": {"ABS": 4280}
+  },
+  "CF-25011": {
+    "category": "concealed_cistern",
+    "name_th": "ถังเก็บน้ำแบบซ่อนแบบติดตั้งในผนัง",
+    "list_price": 7880,
+    "panel_prices": {"ABS": 3000}
+  },
+  "CF-600": {
+    "category": "safety_handrail",
+    "series": "FLUSSO",
+    "name_th": "ราวจับนิรภัย",
+    "colors": ["White", "Chrome"],
+    "list_price": 1980,
+    "notes": "มีหลายขนาด: 400/800/1000/1200 มม. ราคา 1,980 / 2,080 / 2,280 / 2,500 บาท",
+    "project_price": {"min_qty": 100, "price": 1380}
+  },
+  "CF-900": {
+    "category": "safety_handrail",
+    "name_th": "ราวจับนิรภัย ยาว 900 มม.",
+    "dimensions": "ยาว 900 มม.",
+    "list_price": 3840
+  },
+  "CF-L650": {
+    "category": "safety_handrail",
+    "name_th": "ราวจับนิรภัย รูปตัว L",
+    "dimensions": "ยาว 650 มม.",
+    "list_price": 10800
+  },
+  "CF-L680": {
+    "category": "safety_handrail",
+    "name_th": "ราวจับนิรภัย รูปตัว L",
+    "dimensions": "ยาว 680 มม.",
+    "list_price": 15800
+  },
+  "CF-L680M": {
+    "category": "safety_handrail",
+    "name_th": "ราวจับนิรภัย รูปตัว L พร้อมชุดยึด",
+    "dimensions": "ยาว 682 มม.",
+    "list_price": 17800
+  },
+  "CF-L650M": {
+    "category": "safety_handrail",
+    "name_th": "ราวจับนิรภัย รูปตัว L พร้อมชุดยึด",
+    "dimensions": "ยาว 650 มม.",
+    "list_price": 12680
+  },
+  "CF-UA22": {
+    "category": "safety_handrail",
+    "name_th": "ราวจับนิรภัย รูปตัว U",
+    "dimensions": "ยาว 622 มม.",
+    "list_price": 15280
+  },
+  "CF-U58": {
+    "category": "safety_handrail",
+    "name_th": "ราวจับนิรภัย รูปตัว U (ใหญ่)",
+    "dimensions": "ยาว 432 มม.",
+    "list_price": 19860
+  },
+  "CF-104-1": {
+    "category": "safety_handrail",
+    "series": "TRAFFIXPRO",
+    "name_th": "ราวจับนิรภัย I",
+    "dimensions": "377/577/777 มม.",
+    "list_price": "1,280 / 1,480 / 1,680 บาท ตามขนาด"
+  },
+  "CF-104-2": {
+    "category": "safety_handrail",
+    "series": "TRAFFIXPRO",
+    "name_th": "ราวจับนิรภัย I แบบพิเศษ",
+    "dimensions": "376×85 มม.",
+    "list_price": 2580
+  },
+  "CF-104-3": {
+    "category": "safety_handrail",
+    "series": "TRAFFIXPRO",
+    "name_th": "ราวจับนิรภัยที่พักเท้า/แขน",
+    "dimensions": "790×720 มม.",
+    "list_price": 5280
+  },
+  "CF-104-4": {
+    "category": "safety_handrail",
+    "series": "TRAFFIXPRO",
+    "name_th": "ราวจับนิรภัย รูปตัว U",
+    "dimensions": "668×260×92 มม.",
+    "list_price": 4880
+  },
+  "CF-104-5": {
+    "category": "safety_handrail",
+    "series": "TRAFFIXPRO",
+    "name_th": "ราวจับนิรภัย รูปตัว P",
+    "dimensions": "454×620×77 มม.",
+    "list_price": 3880
+  },
+  "CF-A425": {
+    "category": "shower_seat",
+    "name_th": "เก้าอี้นั่งอาบน้ำแบบพับได้",
+    "dimensions": "423×513×208 มม.",
+    "weight_capacity": "150 กก.",
+    "list_price": 12880
+  },
+  "CF-B425": {
+    "category": "shower_seat",
+    "name_th": "เก้าอี้นั่งอาบน้ำแบบพับได้",
+    "dimensions": "443×424 มม.",
+    "weight_capacity": "150 กก.",
+    "list_price": 18880
+  },
+  "CF-C425": {
+    "category": "shower_seat",
+    "series": "TRAFFIXPRO",
+    "name_th": "เก้าอี้นั่งอาบน้ำแบบติดผนัง (Fixed)",
+    "dimensions": "800×635×675 มม.",
+    "weight_capacity": "150 กก.",
+    "list_price": 21800
+  },
+  "CF-D425": {
+    "category": "shower_seat",
+    "name_th": "ชุดเก้าอี้อาบน้ำสำหรับประตูมุมฉาก",
+    "weight_capacity": "150 กก.",
+    "list_price": 35800
+  },
+  "CF-AA20": {
+    "category": "shower_seat",
+    "name_th": "เก้าอี้นั่งอาบน้ำ U แบบพับได้",
+    "dimensions": "445×510 มม.",
+    "weight_capacity": "150 กก.",
+    "list_price": 13880
+  },
+  "CF-BA20": {
+    "category": "shower_seat",
+    "name_th": "เก้าอี้นั่งอาบน้ำ U แบบพับได้",
+    "dimensions": "445×424 มม.",
+    "weight_capacity": "150 กก.",
+    "list_price": 19880
+  },
+  "CF-CA20": {
+    "category": "shower_seat",
+    "name_th": "เก้าอี้นั่งอาบน้ำ U แบบพับได้ (มุมฉาก)",
+    "dimensions": "425×848×674 มม.",
+    "weight_capacity": "150 กก.",
+    "list_price": 22800
+  },
+  "CF-DA20": {
+    "category": "shower_seat",
+    "name_th": "เก้าอี้นั่งอาบน้ำ U แบบพับได้ (มุมฉาก ใหญ่)",
+    "dimensions": "398×668×674 มม.",
+    "weight_capacity": "150 กก.",
+    "list_price": 34800
+  },
+  "CF-S01": {
+    "category": "bidet_spray",
+    "name_th": "หัวฉีดสายชำระ พลาสติก ABS",
+    "includes": ["สายสปริง", "ที่วาง"],
+    "list_price": 850
+  },
+  "CF-S02": {
+    "category": "bidet_spray",
+    "name_th": "หัวฉีดสายชำระ พลาสติก ABS",
+    "includes": ["สายสปริง", "ที่วาง"],
+    "list_price": 850
+  },
+  "CF-S03": {
+    "category": "bidet_spray",
+    "name_th": "หัวฉีดสายชำระ พลาสติก ABS + วาล์วทองเหลือง",
+    "dimensions": "34.5×50.6×200.4 มม.",
+    "includes": ["สายสปริง", "ที่วาง", "วาล์วปิด-เปิดน้ำ"],
+    "list_price": 1050
+  },
+  "CF-B01": {
+    "category": "bidet_spray",
+    "series": "TRAFFIXPRO",
+    "name_th": "หัวฉีดสายชำระ พลาสติก ABS",
+    "dimensions": "24.5×77.5×114.5 มม.",
+    "includes": ["สายสปริง", "ที่วาง"],
+    "list_price": 550
+  },
+  "CF-B02": {
+    "category": "bidet_spray",
+    "series": "TRAFFIXPRO",
+    "name_th": "หัวฉีดสายชำระ สแตนเลส 304",
+    "dimensions": "33.5×113 มม.",
+    "material": "สแตนเลสเกรด 304",
+    "includes": ["สายสปริง", "ที่วาง"],
+    "list_price": 550
+  },
+  "CF-BA02": {
+    "category": "seat_cover",
+    "name_th": "ชุดหัวฉีดชำระแบบบางพิเศษ (ฝาพ่วง)",
+    "dimensions": "417.3×218.3×90.3 มม.",
+    "notes": "รองรับสุขภัณฑ์ทรงมาตรฐาน ฟังก์ชัน 3 รูปแบบ ปรับแรงดันน้ำได้",
+    "list_price": 1880
+  },
+  "CF-STS01": {
+    "category": "seat_cover",
+    "series": "TRAFFIXPRO",
+    "name_th": "ฝารองนั่งสุขภัณฑ์อัจฉริยะพร้อมระบบน้ำหอม",
+    "dimensions": "351.3×489.4 มม.",
+    "notes": "น้ำยาทำความสะอาด 3-in-1 รับน้ำหนักสูงสุด 150 กก.",
+    "list_price": 4580
+  },
+  "CF-TB110": {
+    "category": "seat_cover",
+    "name_th": "ฝารองนั่งไฮโดร-เมคานิค",
+    "dimensions": "368×508 มม.",
+    "notes": "ฟังก์ชัน 3 รูปแบบ ปรับแรงดันน้ำได้ รับน้ำหนักสูงสุด 150 กก.",
+    "list_price": 3580
+  },
+  "CF-2137": {
+    "category": "seat_cover",
+    "name_th": "ฝารองนั่ง (ฝาเดี่ยว)",
+    "dimensions": "726×405×754 มม.",
+    "list_price": 3080
+  },
+  "CF-2138": {
+    "category": "seat_cover",
+    "name_th": "ฝารองนั่ง (ฝาเดี่ยว)",
+    "dimensions": "726×405×760 มม.",
+    "list_price": 3080
+  },
+  "CF-2139": {
+    "category": "seat_cover",
+    "name_th": "ฝารองนั่ง (ฝาคู่)",
+    "dimensions": "726×405×808 มม.",
+    "list_price": 3080
+  },
+  "CF-R805": {
+    "category": "seat_cover",
+    "series": "ADVANCE ENGINEERING",
+    "name_th": "ฝารองนั่งระบบพิเศษ",
+    "dimensions": "819×699×632 มม.",
+    "list_price": 4280
+  },
+  "CF-121004": {
+    "category": "urinal",
+    "name_th": "โถปัสสาวะชาย",
+    "list_price": null,
+    "project_price": {"min_qty": 100, "price": 5280}
+  }
+}
