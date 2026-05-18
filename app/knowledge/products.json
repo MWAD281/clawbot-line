@@ -749,11 +749,5 @@
     "name_th": "ฝารองนั่งระบบพิเศษ",
     "dimensions": "819×699×632 มม.",
     "list_price": 4280
-  },
-  "CF-121004": {
-    "category": "urinal",
-    "name_th": "โถปัสสาวะชาย",
-    "list_price": null,
-    "project_price": {"min_qty": 100, "price": 5280}
   }
 }

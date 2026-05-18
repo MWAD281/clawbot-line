@@ -54,7 +54,7 @@ PRICE_LIST: dict[str, float] = {
     "CF-600": 1980, "CF-C425": 21800, "CF-B425": 18880,
     "CF-18004": 12800, "CF-2138": 3080, "CF-S01": 850,
     # Project-only (retail price 0 = not for retail quoting)
-    "CF-U668": 0, "CF-121004": 0,
+    "CF-U668": 0,
 }
 
 # Project pricing: {SKU: (min_qty, project_price)}
@@ -71,7 +71,6 @@ PROJECT_PRICE_LIST: dict[str, tuple] = {
     "CF-15005": (100, 7560),
     "CF-15027": (100, 13880),
     "CF-4037":  (100, 5280),
-    "CF-121004":(100, 5280),
     "CF-600":   (100, 1380),
     "CF-U622":  (20,  10280),
     "CF-U668":  (20,  13860),
