@@ -59,8 +59,8 @@ async def _handle_message(user_id: str, user_text: str, reply_token: str) -> Non
     try:
         t0 = time.monotonic()
 
-        # 1a. Owner shortcut: "Tony QT" → open quote flow immediately
-        if user_text.strip().lower() == "tony qt":
+        # 1a. Owner shortcut: "Tony QT" → open quote flow — Tony only
+        if user_text.strip().lower() == "tony qt" and settings.tony_line_user_id and user_id == settings.tony_line_user_id:
             form_reply = await start_quote_flow(user_id, store)
             await _send_flow_reply(reply_token, form_reply)
             await log_line_message(user_id, user_text, "[QUOTE_FORM STARTED]", 0)
