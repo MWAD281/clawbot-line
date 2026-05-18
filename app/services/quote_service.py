@@ -23,7 +23,6 @@ from app.services.sheets_service import get_crm_sheet, append_to_sheet
 
 logger = logging.getLogger(__name__)
 
-SPREADSHEET_ID = "184d7kpY7swRCwSJ_eZi8UtrH2K57U1Wzb2Fc9_ShVC8"
 FONTS_DIR = Path(__file__).parent.parent.parent / "scripts" / "fonts"
 OWNER_EMAIL = "tony.cerafield@gmail.com"
 
@@ -159,7 +158,8 @@ def parse_quote_command(text: str) -> dict:
     return {"customer": customer, "project": project, "items": items}
 
 
-def next_qt_number() -> str:
+def _next_qt_number_sync() -> str:
+    """Synchronous — must be called via asyncio.to_thread() from async context."""
     ws = get_crm_sheet("📋 Quotations")
     year = datetime.now().year
     if ws is None:
@@ -175,6 +175,12 @@ def next_qt_number() -> str:
                 pass
     n = max(nums) + 1 if nums else 1
     return f"{prefix}{n:03d}"
+
+
+async def next_qt_number() -> str:
+    """Non-blocking wrapper — runs Sheets I/O in a thread pool."""
+    import asyncio
+    return await asyncio.to_thread(_next_qt_number_sync)
 
 
 def build_pdf_bytes(qt_no, customer, project, items, subtotal, notes="") -> bytes:
@@ -402,7 +408,7 @@ def upload_to_drive(pdf_bytes: bytes, filename: str) -> tuple[Optional[str], Opt
 
 async def create_quotation(customer: str, project: str, items: list, notes: str = "") -> dict:
     """Full flow: QT number → Sheets → PDF → Drive. Returns result dict."""
-    qt_no = next_qt_number()
+    qt_no = await next_qt_number()
     today = datetime.now()
     valid = today + timedelta(days=30)
     subtotal = sum(i["amount"] for i in items)

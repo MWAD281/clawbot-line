@@ -11,7 +11,9 @@ from google.oauth2.service_account import Credentials
 
 logger = logging.getLogger(__name__)
 
-SPREADSHEET_ID = "184d7kpY7swRCwSJ_eZi8UtrH2K57U1Wzb2Fc9_ShVC8"
+def _spreadsheet_id() -> str:
+    from app.config import get_settings
+    return get_settings().google_spreadsheet_id
 LINE_LOG_SHEET = "📱 LINE Log"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
@@ -43,7 +45,7 @@ def _append_sync(user_id: str, user_text: str, bot_reply: str, response_ms: int)
         now = datetime.now()
         log_id = f"BOT-{now.strftime('%Y%m%d')}-{_log_counter:04d}"
 
-        sheet = client.open_by_key(SPREADSHEET_ID).worksheet(LINE_LOG_SHEET)
+        sheet = client.open_by_key(_spreadsheet_id()).worksheet(LINE_LOG_SHEET)
         sheet.append_row(
             [
                 log_id,
@@ -74,8 +76,7 @@ def _append_sync(user_id: str, user_text: str, bot_reply: str, response_ms: int)
 async def log_line_message(
     user_id: str, user_text: str, bot_reply: str, response_ms: int
 ) -> None:
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _append_sync, user_id, user_text, bot_reply, response_ms)
+    await asyncio.to_thread(_append_sync, user_id, user_text, bot_reply, response_ms)
 
 
 def get_crm_sheet(sheet_name: str) -> Optional[gspread.Worksheet]:
@@ -84,7 +85,7 @@ def get_crm_sheet(sheet_name: str) -> Optional[gspread.Worksheet]:
     if client is None:
         return None
     try:
-        return client.open_by_key(SPREADSHEET_ID).worksheet(sheet_name)
+        return client.open_by_key(_spreadsheet_id()).worksheet(sheet_name)
     except Exception as e:
         logger.error("Cannot open sheet '%s': %s", sheet_name, type(e).__name__)
         return None
@@ -95,7 +96,7 @@ def ensure_sheet(sheet_name: str, headers: list) -> Optional[gspread.Worksheet]:
     client = _get_client()
     if client is None:
         return None
-    ss = client.open_by_key(SPREADSHEET_ID)
+    ss = client.open_by_key(_spreadsheet_id())
     try:
         return ss.worksheet(sheet_name)
     except gspread.exceptions.WorksheetNotFound:

@@ -66,13 +66,14 @@ async def _handle_message(user_id: str, user_text: str, reply_token: str) -> Non
             await log_line_message(user_id, user_text, "[QUOTE_FORM STARTED]", 0)
             return
 
-        # 1b. Admin skill commands: tony TR / RP / EM
-        admin_reply = await handle_tony_admin(user_text)
-        if admin_reply is not None:
-            response_ms = int((time.monotonic() - t0) * 1000)
-            await reply_text(reply_token, admin_reply)
-            await log_line_message(user_id, user_text, f"[ADMIN {user_text[:30]}]", response_ms)
-            return
+        # 1b. Admin skill commands: tony TR / RP / EM — Tony only
+        if settings.tony_line_user_id and user_id == settings.tony_line_user_id:
+            admin_reply = await handle_tony_admin(user_text)
+            if admin_reply is not None:
+                response_ms = int((time.monotonic() - t0) * 1000)
+                await reply_text(reply_token, admin_reply)
+                await log_line_message(user_id, user_text, f"[ADMIN {user_text[:30]}]", response_ms)
+                return
 
         # 1c. Power-user shorthand: /quote Customer, SKU x Qty
         if user_text.strip().lower().startswith("/quote"):

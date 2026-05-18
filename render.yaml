@@ -5,18 +5,54 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port 10000
     autoDeploy: false
+    healthCheckPath: /health
     envVars:
+      # ── LINE ─────────────────────────────────────────────────────
       - key: LINE_CHANNEL_SECRET
         sync: false
       - key: LINE_CHANNEL_ACCESS_TOKEN
         sync: false
+
+      # ── OpenAI ───────────────────────────────────────────────────
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL
         value: gpt-4o-mini
       - key: OPENAI_MAX_TOKENS
         value: "1000"
-      - key: MAX_HISTORY_MESSAGES
-        value: "10"
+
+      # ── Google Sheets / Drive ─────────────────────────────────────
+      - key: GOOGLE_CREDENTIALS_JSON
+        sync: false
+      - key: GOOGLE_SPREADSHEET_ID
+        sync: false
+      - key: DRIVE_FOLDER_ID
+        sync: false
+      - key: GOOGLE_OAUTH_REFRESH_TOKEN
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+
+      # ── Admin ─────────────────────────────────────────────────────
+      - key: TONY_LINE_USER_ID
+        sync: false
+
+      # ── App config ───────────────────────────────────────────────
       - key: APP_ENV
         value: production
+      - key: MAX_HISTORY_MESSAGES
+        value: "10"
+      - key: MAX_CONTEXT_TOKENS
+        value: "3500"
+      - key: DAILY_MESSAGE_LIMIT
+        value: "100"
+      - key: AGENTS_ENABLED
+        value: "true"
+
+      # ── Optional ─────────────────────────────────────────────────
+      - key: REDIS_URL
+        sync: false
+      - key: SENTRY_DSN
+        sync: false

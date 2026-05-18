@@ -14,3 +14,4 @@ env/
 .coverage
 htmlcov/
 *.log
+scripts/client_secrets.json
