@@ -92,9 +92,41 @@ def _register_fonts() -> tuple[str, str]:
     return "Helvetica", "Helvetica-Bold"
 
 
+def _extract_sku_qty(part: str) -> tuple[str, int]:
+    """
+    Flexibly extract (SKU, qty) from a part string.
+    Supports formats:
+      CF-13022 x5        (original)
+      CF-13022 x 5       (space after x)
+      CF-13022 5         (just a number)
+      CF-13022 5 ชิ้น    (Thai unit word)
+      CF-13022 5 อัน
+      CF-13022 5 ตัว
+      CF-13022 จำนวน 5   (Thai: "quantity N")
+      CF-13022 5 pcs
+      CF-13022 5 units
+    """
+    import re
+    part = part.strip()
+
+    # Extract SKU: uppercase letters, digits, hyphens (e.g. CF-13022)
+    sku_match = re.match(r'^([A-Za-z0-9][A-Za-z0-9\-]*)', part)
+    if not sku_match:
+        return part.upper(), 1
+    sku = sku_match.group(1).upper()
+    remainder = part[len(sku_match.group(0)):].strip()
+
+    # Find quantity: first integer in remainder
+    qty_match = re.search(r'\d+', remainder)
+    qty = int(qty_match.group()) if qty_match else 1
+
+    return sku, qty
+
+
 def parse_quote_command(text: str) -> dict:
     """
     Parse: /quote Customer Name [/ Project], SKU x Qty, SKU x Qty
+    Supports flexible quantity formats (x5, 5 ชิ้น, จำนวน 5, 5 pcs, etc.)
     Returns: {customer, project, items: [{sku, qty, unit_price, amount}]}
     """
     body = text[len("/quote"):].strip()
@@ -115,16 +147,7 @@ def parse_quote_command(text: str) -> dict:
         part = part.strip()
         if not part:
             continue
-        qty = 1
-        if " x" in part.lower():
-            idx = part.lower().rfind(" x")
-            sku = part[:idx].strip().upper()
-            try:
-                qty = int(part[idx + 2:].strip())
-            except ValueError:
-                pass
-        else:
-            sku = part.upper()
+        sku, qty = _extract_sku_qty(part)
         # Use project pricing if qty meets the threshold
         if sku in PROJECT_PRICE_LIST:
             min_qty, proj_price = PROJECT_PRICE_LIST[sku]
