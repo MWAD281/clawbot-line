@@ -11,7 +11,7 @@ from app.config import get_settings
 from app.core.ai_engine import get_ai_reply
 from app.limiter import limiter
 from app.memory.store import get_store
-from app.services.line_service import push_qt_alert, reply_catalog, reply_company_profile, reply_quick, reply_text
+from app.services.line_service import push_catalog, push_qt_alert, reply_catalog, reply_company_profile, reply_quick, reply_text
 from app.services.admin_service import handle_tony_admin
 from app.services.lead_flow_service import LeadReply, handle_lead_flow, start_lead_flow
 from app.services.quote_flow_service import FlowReply, handle_quote_flow, start_quote_flow
@@ -109,6 +109,13 @@ async def _handle_message(user_id: str, user_text: str, reply_token: str) -> Non
             lr = await start_lead_flow(user_id, store)
             await _send_lead_reply(reply_token, lr)
             await log_line_message(user_id, user_text, "[LEAD_FORM STARTED]", response_ms)
+        elif "[CATALOG]" in reply:
+            # Sera embedded [CATALOG] in a longer message — reply with text, push catalog separately
+            clean = reply.replace("[CATALOG]", "").strip()
+            if clean:
+                await reply_text(reply_token, clean)
+            await push_catalog(user_id)
+            await log_line_message(user_id, user_text, "[CATALOG SENT + TEXT]", response_ms)
         else:
             await reply_text(reply_token, reply)
             await log_line_message(user_id, user_text, reply, response_ms)

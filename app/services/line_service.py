@@ -134,13 +134,21 @@ async def push_text(to: str, text: str) -> None:
         raise
 
 
-async def reply_catalog(reply_token: str) -> None:
-    text = (
+def _catalog_text() -> str:
+    return (
         "📚 CERAFIELD Product Catalog 2026\n"
         "รวมสุขภัณฑ์ทุกซีรีส์ — Core, C-Heritage, Lagoons, FLUSSO\n\n"
         f"🔗 {CATALOG_URL}"
     )
-    await reply_text(reply_token, text)
+
+
+async def reply_catalog(reply_token: str) -> None:
+    await reply_text(reply_token, _catalog_text())
+
+
+async def push_catalog(to: str) -> None:
+    """Push catalog to a user — use when [CATALOG] is embedded in a longer reply."""
+    await push_text(to, _catalog_text())
 
 
 async def reply_company_profile(reply_token: str) -> None:
