@@ -15,7 +15,7 @@ from app.services.line_service import push_qt_alert, reply_catalog, reply_compan
 from app.services.admin_service import handle_tony_admin
 from app.services.lead_flow_service import LeadReply, handle_lead_flow, start_lead_flow
 from app.services.quote_flow_service import FlowReply, handle_quote_flow, start_quote_flow
-from app.services.quote_service import create_quotation, parse_quote_command
+from app.services.quote_service import create_quotation
 from app.services.sheets_service import log_line_message
 
 logger = logging.getLogger(__name__)
@@ -74,27 +74,6 @@ async def _handle_message(user_id: str, user_text: str, reply_token: str) -> Non
                 await reply_text(reply_token, admin_reply)
                 await log_line_message(user_id, user_text, f"[ADMIN {user_text[:30]}]", response_ms)
                 return
-
-        # 1c. Power-user shorthand: /quote Customer, SKU x Qty
-        if user_text.strip().lower().startswith("/quote"):
-            parsed = parse_quote_command(user_text)
-            if not parsed or not parsed.get("items"):
-                await reply_text(reply_token, "รูปแบบ: /quote ชื่อลูกค้า [/ โปรเจกต์], SKU x จำนวน\nตัวอย่าง: /quote Holiday Inn / ห้อง 201, CF-13022 x10, CF-600 x5")
-                return
-            result = await create_quotation(parsed["customer"], parsed["project"], parsed["items"])
-            response_ms = int((time.monotonic() - t0) * 1000)
-            lines = "\n".join(f"  {it['sku']} x{it['qty']}  {it['amount']:,.0f} บาท" for it in result["items"])
-            drive_line = f"\nPDF: {result['drive_url']}" if result.get("drive_url") else f"\nPDF error: {result.get('drive_error', 'unknown')}"
-            reply = (
-                f"ใบเสนอราคา {result['qt_no']}\nลูกค้า: {result['customer']}"
-                + (f"\nโปรเจกต์: {result['project']}" if result.get("project") else "")
-                + f"\n\n{lines}\n\nSubtotal: {result['subtotal']:,.0f} บาท\nVAT 7%:   {result['vat']:,.0f} บาท\nรวม:      {result['total']:,.0f} บาท{drive_line}"
-            )
-            await reply_text(reply_token, reply)
-            if settings.tony_line_user_id:
-                await push_qt_alert(settings.tony_line_user_id, result)
-            await log_line_message(user_id, user_text, f"[QUOTE {result['qt_no']}]", response_ms)
-            return
 
         # 2. Active lead flow
         lead_reply = await handle_lead_flow(user_id, user_text, store)
