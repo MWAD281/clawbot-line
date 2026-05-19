@@ -90,7 +90,7 @@ def _confirm_text(state: dict, items: list) -> str:
         f"Subtotal: {subtotal:,.0f} บาท\n"
         f"VAT 7%:   {vat:,.0f} บาท\n"
         f"รวม:      {total:,.0f} บาท\n\n"
-        f"ยืนยันสร้าง PDF ได้เลยคะ"
+        f"ยืนยันเพื่อสร้างใบเสนอราคา (PDF) ได้เลยค่ะ"
     )
 
 
@@ -237,8 +237,13 @@ def _parse_products(text: str, state: dict):
     return items
 
 
+_CONFIRM_YES = {"ยืนยัน", "yes", "ok", "ใช่", "ตกลง", "confirm", "ได้เลย", "ได้"}
+_CONFIRM_EDIT = {"แก้ไขสินค้า", "แก้ไข", "edit", "เปลี่ยน"}
+
+
 async def _handle_confirm(text: str, state: dict, products_step: str, user_id: str, store) -> FlowReply:
-    if text in ("ยืนยัน",):
+    t_lower = text.strip().lower()
+    if any(t_lower.startswith(w) for w in _CONFIRM_YES):
         await store.clear_quote_flow(user_id)
         try:
             items = state.get("items", [])
@@ -249,12 +254,12 @@ async def _handle_confirm(text: str, state: dict, products_step: str, user_id: s
         except Exception as e:
             logger.error("Quote flow create_quotation error: %s", e)
             return FlowReply(text="เกิดข้อผิดพลาดในการสร้างใบเสนอราคา กรุณาลองใหม่ค่ะ")
-    if text in ("แก้ไขสินค้า",):
+    if any(t_lower.startswith(w) for w in _CONFIRM_EDIT):
         hint = _HINT_PROJECT if state.get("quote_type") == "project" else _HINT_RETAIL
         state["step"] = products_step
         await store.set_quote_flow(user_id, state)
-        return FlowReply(text=f"พิมพ์สินค้าใหม่ได้เลยคะ\n\n{hint}")
+        return FlowReply(text=f"พิมพ์สินค้าใหม่ได้เลยค่ะ\n\n{hint}")
     return FlowReply(
-        text="กรุณากดปุ่มค่ะ",
+        text="กรุณากดปุ่มยืนยัน หรือแก้ไขสินค้าค่ะ",
         quick_reply=["ยืนยัน", "แก้ไขสินค้า"],
     )

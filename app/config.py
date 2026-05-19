@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     openai_api_key: str = Field(..., validation_alias="OPENAI_API_KEY")
     openai_model: str = Field("gpt-4o-mini", validation_alias="OPENAI_MODEL")
     openai_max_tokens: int = Field(1000, validation_alias="OPENAI_MAX_TOKENS")
+    openai_temperature: float = Field(0.4, validation_alias="OPENAI_TEMPERATURE")
     max_history_messages: int = Field(10, validation_alias="MAX_HISTORY_MESSAGES")
     app_env: str = Field("production", validation_alias="APP_ENV")
     redis_url: Optional[str] = Field(None, validation_alias="REDIS_URL")

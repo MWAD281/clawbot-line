@@ -27,6 +27,7 @@ async def create_completion(messages: list, tools: Optional[list] = None, max_re
         "model": settings.openai_model,
         "messages": messages,
         "max_tokens": settings.openai_max_tokens,
+        "temperature": settings.openai_temperature,
     }
     if tools:
         kwargs["tools"] = tools
