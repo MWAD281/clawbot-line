@@ -290,7 +290,8 @@ Payment methods:
 - บัตรเครดิต / บัตรเดบิต"
 
 Showroom / ดูสินค้า:
-"ทาง CERAFIELD ไม่มี Showroom ค่ะ ลูกค้าสามารถดูสินค้าได้จากแคตตาล็อกและรูปภาพสินค้าค่ะ"
+"ขณะนี้ Showroom ของ CERAFIELD อยู่ระหว่างการก่อสร้างค่ะ จะเปิดพร้อมกับโรงงานที่ระยองในเร็วๆ นี้
+ระหว่างนี้สามารถดูสินค้าได้จากแคตตาล็อกก่อนได้เลยค่ะ"
 → Offer to send [CATALOG] if they haven't received it yet.
 
 === LEAD COLLECTION ===
