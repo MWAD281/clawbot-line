@@ -38,6 +38,27 @@ async def _send_lead_reply(reply_token: str, lr: LeadReply) -> None:
     await reply_text(reply_token, lr.text)
 
 
+async def _notify_step4_lead(user_id: str, store) -> None:
+    """Push a summary of the last few conversation turns to Tony after Step 4 lead capture."""
+    settings = get_settings()
+    if not settings.tony_line_user_id:
+        return
+    try:
+        history = await store.get_history(user_id)
+        recent = history[-8:] if len(history) >= 8 else history
+        lines = []
+        for m in recent:
+            icon = "👤" if m["role"] == "user" else "🤖"
+            lines.append(f"{icon} {(m.get('content') or '')[:120]}")
+        summary = "\n".join(lines)
+        msg = f"📋 Lead ใหม่ (Step 4)\nLINE: {user_id[:12]}...\n\n{summary[:600]}"
+        from app.services.line_service import push_text
+        import asyncio
+        asyncio.create_task(push_text(settings.tony_line_user_id, msg))
+    except Exception as e:
+        logger.warning("Step4 lead notify failed: %s", e)
+
+
 async def _handle_message(user_id: str, user_text: str, reply_token: str) -> None:
     """Background task: enforce daily limit, call OpenAI, and send LINE reply."""
     settings = get_settings()
@@ -109,6 +130,13 @@ async def _handle_message(user_id: str, user_text: str, reply_token: str) -> Non
             lr = await start_lead_flow(user_id, store)
             await _send_lead_reply(reply_token, lr)
             await log_line_message(user_id, user_text, "[LEAD_FORM STARTED]", response_ms)
+        elif "[NOTIFY_LEAD]" in reply:
+            # Step 4 lead: info already collected in conversation — send closing text, notify Tony
+            clean = reply.replace("[NOTIFY_LEAD]", "").strip()
+            if clean:
+                await reply_text(reply_token, clean)
+            await _notify_step4_lead(user_id, store)
+            await log_line_message(user_id, user_text, "[STEP4 LEAD CAPTURED]", response_ms)
         elif "[CATALOG]" in reply:
             # Sera embedded [CATALOG] in a longer message — reply with text, push catalog separately
             clean = reply.replace("[CATALOG]", "").strip()

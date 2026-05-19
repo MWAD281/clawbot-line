@@ -52,7 +52,7 @@ async def handle_lead_flow(user_id: str, text: str, store) -> Optional[LeadReply
         _save_lead(user_id, t)
         _notify_admin(user_id, t)
         return LeadReply(
-            text="ขอบคุณค่ะ ทีม AE จะติดต่อกลับภายใน 24 ชั่วโมงค่ะ\nถ้ามีคำถามเพิ่มเติมสอบถามได้เลยนะคะ"
+            text="ขอบคุณค่ะ ทีมงาน CERAFIELD จะติดต่อกลับภายใน 24 ชั่วโมงค่ะ\nถ้ามีคำถามเพิ่มเติมสอบถามได้เลยนะคะ"
         )
 
     await store.clear_lead_flow(user_id)
